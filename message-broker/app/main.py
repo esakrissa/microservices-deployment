@@ -1,11 +1,12 @@
 from fastapi import FastAPI, HTTPException
 import os
-import redis
-import json
 import logging
 from pydantic import BaseModel
 import httpx
 from typing import Optional
+from google.cloud import pubsub_v1
+import json
+import uuid
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -13,21 +14,27 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Message Broker Service")
 
-# Redis configuration
-REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
-REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
-REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "")
+# GCP Pub/Sub configuration
+PROJECT_ID = os.getenv("GCP_PROJECT_ID")
+TOPIC_ID = os.getenv("GCP_PUBSUB_TOPIC_ID", "messages")
 
 # Telegram bot service URL
 TELEGRAM_BOT_URL = os.getenv("TELEGRAM_BOT_URL", "http://localhost:8080")
 
-# Initialize Redis client
-redis_client = redis.Redis(
-    host=REDIS_HOST,
-    port=REDIS_PORT,
-    password=REDIS_PASSWORD,
-    decode_responses=True
-)
+# Initialize Pub/Sub publisher
+publisher = pubsub_v1.PublisherClient()
+topic_path = publisher.topic_path(PROJECT_ID, TOPIC_ID)
+
+# Check if the topic exists, if not create it
+try:
+    publisher.get_topic(request={"topic": topic_path})
+    logger.info(f"Topic {topic_path} already exists")
+except Exception as e:
+    try:
+        publisher.create_topic(request={"name": topic_path})
+        logger.info(f"Topic {topic_path} created successfully")
+    except Exception as e:
+        logger.error(f"Failed to create topic: {str(e)}")
 
 class Message(BaseModel):
     user_id: str
@@ -41,8 +48,10 @@ async def root():
 @app.post("/send")
 async def send_message(message: Message):
     try:
-        # Store message in Redis
-        message_id = redis_client.incr("message_id")
+        # Create a unique message ID
+        message_id = str(uuid.uuid4())
+        
+        # Prepare message data
         message_data = {
             "id": message_id,
             "user_id": message.user_id,
@@ -50,10 +59,12 @@ async def send_message(message: Message):
             "service": message.service or "unknown"
         }
         
-        redis_client.hset(f"message:{message_id}", mapping=message_data)
-        redis_client.lpush("message_queue", message_id)
+        # Publish message to Pub/Sub
+        data = json.dumps(message_data).encode("utf-8")
+        future = publisher.publish(topic_path, data)
+        pub_id = future.result()
         
-        logger.info(f"Message queued: {message_data}")
+        logger.info(f"Message published to Pub/Sub with ID: {pub_id}")
         
         # Forward to Telegram bot service
         async with httpx.AsyncClient() as client:
@@ -77,8 +88,8 @@ async def send_message(message: Message):
 @app.get("/health")
 async def health_check():
     try:
-        # Check Redis connection
-        redis_client.ping()
+        # Check Pub/Sub connection by listing topics
+        publisher.list_topics(request={"project": f"projects/{PROJECT_ID}"})
         return {"status": "healthy"}
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")

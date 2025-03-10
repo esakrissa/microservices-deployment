@@ -8,14 +8,15 @@ This guide provides step-by-step instructions for deploying the microservices pr
 - [Deployment Process](#deployment-process)
   - [1. Clone the Repository](#1-clone-the-repository)
   - [2. Set Up Workload Identity Federation](#2-set-up-workload-identity-federation)
-  - [3. Configure GitHub Secrets](#3-configure-github-secrets)
-  - [4. Initial Terraform Deployment](#4-initial-terraform-deployment)
-  - [5. Update GitHub Secrets](#5-update-github-secrets-with-deployment-information)
-  - [6. Update Terraform Variables](#6-update-terraform-variables)
-  - [7. Set Up SSH Access to VM](#7-set-up-ssh-access-to-vm)
-  - [8. Trigger CI/CD Pipeline](#8-push-code-to-github-to-trigger-cicd)
-  - [9. Configure Telegram Webhook](#9-configure-telegram-webhook)
-  - [10. Verify Deployment](#10-verify-deployment)
+  - [3. Set Up Google Cloud Pub/Sub](#3-set-up-google-cloud-pubsub)
+  - [4. Configure GitHub Secrets](#4-configure-github-secrets)
+  - [5. Initial Terraform Deployment](#5-initial-terraform-deployment)
+  - [6. Update GitHub Secrets](#6-update-github-secrets-with-deployment-information)
+  - [7. Update Terraform Variables](#7-update-terraform-variables)
+  - [8. Set Up SSH Access to VM](#8-set-up-ssh-access-to-vm)
+  - [9. Trigger CI/CD Pipeline](#9-push-code-to-github-to-trigger-cicd)
+  - [10. Configure Telegram Webhook](#10-configure-telegram-webhook)
+  - [11. Verify Deployment](#11-verify-deployment)
 - [Continuous Deployment](#continuous-deployment)
 - [Troubleshooting](#troubleshooting)
 - [Maintenance](#maintenance)
@@ -26,7 +27,7 @@ This guide provides step-by-step instructions for deploying the microservices pr
 **Infrastructure Automation**: Terraform automatically provisions all required infrastructure:
 - ✅ VM instance for FastAPI application
 - ✅ Cloud Run services for Telegram Bot and Message Broker
-- ✅ Redis instance for the message broker
+- ✅ Google Cloud Pub/Sub for the message broker
 - ✅ Artifact Registry repository
 - ✅ Service accounts and IAM permissions
 
@@ -75,7 +76,21 @@ The script will guide you through:
 
 > **Important**: Note the output values for GitHub secrets needed in the next step.
 
-### 3. Configure GitHub Secrets
+### 3. Set Up Google Cloud Pub/Sub
+
+Run the setup script to configure Pub/Sub for the message broker:
+
+```bash
+export GCP_PROJECT_ID=your-project-id
+./scripts/setup-pubsub.sh
+```
+
+This will:
+- Enable the Pub/Sub API
+- Create a topic for messages
+- Create a subscription for processing messages
+
+### 4. Configure GitHub Secrets
 
 Add these initial secrets to your GitHub repository (Settings > Secrets and variables > Actions):
 
@@ -87,7 +102,7 @@ Add these initial secrets to your GitHub repository (Settings > Secrets and vari
 | `GCP_REGION` | Your preferred GCP region (e.g., us-central1) |
 | `TELEGRAM_TOKEN` | Your Telegram bot token |
 
-### 4. Initial Terraform Deployment
+### 5. Initial Terraform Deployment
 
 The first deployment needs to be done manually to set up the infrastructure:
 
@@ -113,9 +128,9 @@ This will create all the infrastructure components. Note the outputs, which incl
 - `fastapi_vm_ip`: The public IP of your VM
 - `telegram_bot_url`: The URL of your Telegram bot service
 - `message_broker_url`: The URL of your message broker service
-- `redis_host` and `redis_port`: Redis connection details
+- `GCP_PUBSUB_TOPIC_ID` and `GCP_PUBSUB_SUBSCRIPTION_ID`: Pub/Sub topic and subscription IDs
 
-### 5. Update GitHub Secrets with Deployment Information
+### 6. Update GitHub Secrets with Deployment Information
 
 Add these additional secrets to your GitHub repository:
 
@@ -126,11 +141,11 @@ Add these additional secrets to your GitHub repository:
 | `VM_SSH_KEY` | Your private SSH key for VM access |
 | `BROKER_URL` | The `message_broker_url` value from Terraform output |
 | `FASTAPI_URL` | `http://<fastapi_vm_ip>:80` |
-| `REDIS_HOST` | The `redis_host` value from Terraform output |
-| `REDIS_PORT` | The `redis_port` value from Terraform output |
+| `GCP_PUBSUB_TOPIC_ID` | The Pub/Sub topic ID (default: messages) |
+| `GCP_PUBSUB_SUBSCRIPTION_ID` | The Pub/Sub subscription ID (default: messages-sub) |
 | `TELEGRAM_BOT_URL` | The `telegram_bot_url` value from Terraform output |
 
-### 6. Update Terraform Variables
+### 7. Update Terraform Variables
 
 Now that you have the actual message broker URL, update the Terraform configuration:
 
@@ -141,7 +156,7 @@ terraform apply -var="project_id=YOUR_PROJECT_ID" \
   -var="broker_url=YOUR_BROKER_URL"
 ```
 
-### 7. Set Up SSH Access to VM
+### 8. Set Up SSH Access to VM
 
 Generate an SSH key if you don't already have one:
 
@@ -157,7 +172,7 @@ Add your public key to the VM's metadata in the Google Cloud Console:
 5. Paste your public key content
 6. Save
 
-### 8. Push Code to GitHub to Trigger CI/CD
+### 9. Push Code to GitHub to Trigger CI/CD
 
 ```bash
 git add .
@@ -170,7 +185,7 @@ This will trigger the GitHub Actions workflows, which will:
 2. Push Docker images to Artifact Registry
 3. Deploy the services to their respective environments
 
-### 9. Configure Telegram Webhook
+### 10. Configure Telegram Webhook
 
 Set up the webhook for your Telegram bot:
 
@@ -180,13 +195,21 @@ curl -F "url=<telegram_bot_url>/webhook" https://api.telegram.org/bot<TELEGRAM_T
 
 Replace `<telegram_bot_url>` with your actual Telegram bot URL and `<TELEGRAM_TOKEN>` with your Telegram bot token.
 
-### 10. Verify Deployment
+### 11. Verify Deployment
 
 1. Check that all services are running:
    - VM: SSH into the VM and run `docker ps` to verify the FastAPI container is running
    - Cloud Run: Check the Cloud Run console to verify the Telegram bot and message broker services are deployed
 
-2. Test the Telegram bot by sending a message to it.
+2. Check Docker containers:
+   ```bash
+   docker ps -a
+   ```
+
+3. Check container logs:
+   ```bash
+   docker logs <container_id>
+   ```
 
 ## Continuous Deployment
 

@@ -1,0 +1,19 @@
+How to deploy:
+1. Clone the repository: git clone <repository-url> && cd <repository-directory>
+2. Install required tools: gcloud, terraform, docker
+3. Run setup script: ./scripts/setup.sh
+4. Set up Workload Identity: ./scripts/setup-workload-identity.sh
+5. Set GCP_PROJECT_ID: export GCP_PROJECT_ID=your-project-id
+6. Set up Pub/Sub: ./scripts/setup-pubsub.sh
+7. Configure GitHub Secrets: WORKLOAD_IDENTITY_PROVIDER, SERVICE_ACCOUNT, GCP_PROJECT_ID, GCP_REGION, TELEGRAM_TOKEN
+8. Initialize Terraform: cd terraform && terraform init
+9. Apply Terraform: terraform apply -var="project_id=$GCP_PROJECT_ID" -var="region=your-region" -var="telegram_token=your-token"
+10. Note Terraform outputs: fastapi_vm_ip, telegram_bot_url, message_broker_url
+11. Add more GitHub Secrets: VM_HOST, VM_USERNAME, VM_SSH_KEY, BROKER_URL, FASTAPI_URL, GCP_PUBSUB_TOPIC_ID, GCP_PUBSUB_SUBSCRIPTION_ID, TELEGRAM_BOT_URL
+12. Update Terraform with broker URL: terraform apply -var="broker_url=your-broker-url"
+13. Generate SSH key: ssh-keygen -t rsa -b 4096
+14. Add SSH key to VM metadata in Google Cloud Console
+15. Push code to GitHub: git add . && git commit -m "Initial deployment" && git push origin main
+16. Set up Telegram webhook: curl -F "url=<telegram_bot_url>/webhook" https://api.telegram.org/bot<TELEGRAM_TOKEN>/setWebhook
+17. Test the Telegram bot by sending a message
+18. Monitor logs: gcloud logging read "resource.type=cloud_run_revision"

@@ -10,7 +10,7 @@ This project demonstrates a secure, scalable microservices architecture with:
 |---------|------------|------------|
 | FastAPI App | Python/FastAPI | VM Instance (e2-micro) |
 | Telegram Bot | Python | Cloud Run |
-| Message Broker | Python | Cloud Run + Redis |
+| Message Broker | Python | Cloud Run + Google Cloud Pub/Sub |
 
 All infrastructure is managed as code with Terraform and deployed automatically via GitHub Actions CI/CD pipelines using Workload Identity Federation for secure authentication.
 
@@ -20,7 +20,7 @@ All infrastructure is managed as code with Terraform and deployed automatically 
 
 - **FastAPI Application**: REST API for processing messages
 - **Telegram Bot**: Handles user interactions via Telegram
-- **Message Broker**: Facilitates communication between services using Redis for message queuing
+- **Message Broker**: Facilitates communication between services using Google Cloud Pub/Sub for message queuing
 - **Artifact Registry**: Secure storage for container images
 - **Workload Identity Federation**: Keyless authentication for GitHub Actions
 
@@ -115,9 +115,8 @@ Set up the following secrets in your GitHub repository:
 - `TELEGRAM_TOKEN`: Your Telegram bot token
 - `BROKER_URL`: URL of the message broker service (after initial deployment)
 - `FASTAPI_URL`: URL of the FastAPI service (after initial deployment)
-- `REDIS_HOST`: Redis host (after initial deployment)
-- `REDIS_PORT`: Redis port (after initial deployment)
-- `REDIS_PASSWORD`: Redis password (if applicable)
+- `GCP_PUBSUB_TOPIC_ID`: Google Cloud Pub/Sub topic ID (default: messages)
+- `GCP_PUBSUB_SUBSCRIPTION_ID`: Google Cloud Pub/Sub subscription ID (default: messages-sub)
 - `TELEGRAM_BOT_URL`: URL of the Telegram bot service (after initial deployment)
 
 ## 📊 Monitoring and Logging
@@ -131,7 +130,7 @@ Set up the following secrets in your GitHub repository:
 
 - **FastAPI VM**: Manual scaling by changing machine type in Terraform
 - **Cloud Run Services**: Automatic scaling based on load
-- **Redis**: Scalable memory configuration
+- **Pub/Sub**: Fully managed and automatically scales with your workload
 
 ## 📝 Development
 
