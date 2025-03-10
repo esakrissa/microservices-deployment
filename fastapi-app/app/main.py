@@ -21,7 +21,7 @@ class Message(BaseModel):
     
 @app.get("/")
 async def root():
-    return {"message": "FastAPI Service v1.3 is running"}
+    return {"message": "FastAPI Service v1.4 is running"}
 
 @app.post("/process")
 async def process_message(message: Message):
