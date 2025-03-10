@@ -42,8 +42,25 @@ def process_message(message):
         data = json.loads(message.data.decode("utf-8"))
         logger.info(f"Received message: {data}")
         
-        # Process the message here
-        # For example, you could forward it to another service
+        # Forward the message to the Telegram bot
+        if "user_id" in data and "content" in data:
+            try:
+                # Use httpx to send the message to the Telegram bot
+                with httpx.Client(timeout=10.0) as client:
+                    response = client.post(
+                        f"{TELEGRAM_BOT_URL}/send",
+                        json={
+                            "user_id": data["user_id"],
+                            "content": data["content"]
+                        }
+                    )
+                    
+                    if response.status_code == 200:
+                        logger.info(f"Message forwarded to Telegram bot successfully")
+                    else:
+                        logger.error(f"Failed to forward message to Telegram bot: {response.text}")
+            except Exception as e:
+                logger.error(f"Error forwarding message to Telegram bot: {str(e)}")
         
         # Acknowledge the message
         message.ack()
