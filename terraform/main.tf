@@ -4,12 +4,10 @@ provider "google" {
   zone    = var.zone
 }
 
-# Create Artifact Registry repository
-resource "google_artifact_registry_repository" "app_repo" {
+# Use existing Artifact Registry repository
+data "google_artifact_registry_repository" "app_repo" {
   location      = var.region
   repository_id = "app-images"
-  description   = "Docker repository for application images"
-  format        = "DOCKER"
 }
 
 # VM Instance for FastAPI
@@ -20,7 +18,7 @@ resource "google_compute_instance" "fastapi_vm" {
 
   boot_disk {
     initialize_params {
-      image = "ubuntu-os-cloud/ubuntu-2404-noble-amd64-v20240521"
+      image = "ubuntu-os-cloud/ubuntu-2204-lts"
       size  = 30  # 30GB disk to stay within free tier
       type  = "pd-standard"  # Standard persistent disk for free tier
     }
@@ -135,20 +133,6 @@ resource "google_cloud_run_service_iam_member" "telegram_bot_public" {
   member   = "allUsers"
 }
 
-# Redis instance for message broker
-resource "google_redis_instance" "message_broker_redis" {
-  name           = "message-broker-redis"
-  tier           = "BASIC"
-  memory_size_gb = 1
-  region         = var.region
-  
-  redis_version  = "REDIS_6_X"
-  
-  authorized_network = "default"
-  
-  display_name = "Message Broker Redis"
-}
-
 # Cloud Run service for Message Broker with Workload Identity Federation
 resource "google_cloud_run_service" "message_broker" {
   name     = "message-broker"
@@ -160,13 +144,18 @@ resource "google_cloud_run_service" "message_broker" {
         image = "${var.region}-docker.pkg.dev/${var.project_id}/app-images/message-broker:latest"
         
         env {
-          name  = "REDIS_HOST"
-          value = google_redis_instance.message_broker_redis.host
+          name  = "GCP_PROJECT_ID"
+          value = var.project_id
         }
         
         env {
-          name  = "REDIS_PORT"
-          value = google_redis_instance.message_broker_redis.port
+          name  = "GCP_PUBSUB_TOPIC_ID"
+          value = "messages"
+        }
+        
+        env {
+          name  = "GCP_PUBSUB_SUBSCRIPTION_ID"
+          value = "messages-sub"
         }
         
         env {

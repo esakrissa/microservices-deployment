@@ -13,12 +13,12 @@ output "message_broker_url" {
   value       = google_cloud_run_service.message_broker.status[0].url
 }
 
-output "redis_host" {
-  description = "The Redis instance host"
-  value       = google_redis_instance.message_broker_redis.host
+output "pubsub_topic_id" {
+  description = "The Pub/Sub topic ID"
+  value       = "messages"
 }
 
-output "redis_port" {
-  description = "The Redis instance port"
-  value       = google_redis_instance.message_broker_redis.port
+output "pubsub_subscription_id" {
+  description = "The Pub/Sub subscription ID"
+  value       = "messages-sub"
 }
