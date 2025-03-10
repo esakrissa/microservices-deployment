@@ -73,7 +73,11 @@ jobs:
         image: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/app-images/message-broker:${{ github.sha }}
         region: ${{ secrets.GCP_REGION }}
         env_vars: |
-          REDIS_HOST=${{ secrets.REDIS_HOST }}
-          REDIS_PORT=${{ secrets.REDIS_PORT }}
-          REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
           TELEGRAM_BOT_URL=${{ secrets.TELEGRAM_BOT_URL }}
+          env:
+            PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+            REGION: us-central1
+            REPOSITORY: app-images
+            SERVICE: message-broker
+            PUBSUB_TOPIC: messages
+            PUBSUB_SUBSCRIPTION: message-broker-sub
