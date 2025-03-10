@@ -4,3 +4,5 @@ pydantic
 httpx
 redis
 python-dotenv
+pytest
+pytest-asyncio
