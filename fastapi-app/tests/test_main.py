@@ -6,7 +6,7 @@ client = TestClient(app)
 def test_read_root():
     response = client.get("/")
     assert response.status_code == 200
-    assert response.json() == {"message": "FastAPI Service v1.1 is running"}
+    assert response.json() == {"message": "FastAPI Service v1.2 is running"}
 
 def test_health_check():
     response = client.get("/health")
