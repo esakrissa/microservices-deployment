@@ -73,5 +73,5 @@ jobs:
         image: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/app-images/telegram-bot:${{ github.sha }}
         region: ${{ secrets.GCP_REGION }}
         env_vars: |
-          TELEGRAM_TOKEN=${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
           FASTAPI_URL=${{ secrets.FASTAPI_URL }}
