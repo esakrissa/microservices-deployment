@@ -20,8 +20,8 @@ router = APIRouter(prefix="/test", tags=["test"])
 # Get environment variables
 BROKER_URL = os.getenv("BROKER_URL", "http://message-broker:8080")
 GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID", "local-project")
-GCP_PUBSUB_TOPIC_ID = os.getenv("GCP_PUBSUB_TOPIC_ID", "local-messages")
-GCP_PUBSUB_SUBSCRIPTION_ID = os.getenv("GCP_PUBSUB_SUBSCRIPTION_ID", "local-messages-sub")
+GCP_PUBSUB_TOPIC_ID = os.getenv("GCP_PUBSUB_TOPIC_ID", "messages")
+GCP_PUBSUB_SUBSCRIPTION_ID = os.getenv("GCP_PUBSUB_SUBSCRIPTION_ID", "messages-sub")
 
 # Models
 class TestMessage(BaseModel):
@@ -40,17 +40,13 @@ class TestResponse(BaseModel):
 
 @router.get("/", response_model=TestResponse)
 async def test_root():
-    """Test endpoint to check if the test router is working."""
+    """Test endpoint to check if the API is running."""
     return {
         "success": True,
         "message": "Test endpoints are working",
         "data": {
-            "environment": {
-                "BROKER_URL": BROKER_URL,
-                "GCP_PROJECT_ID": GCP_PROJECT_ID,
-                "GCP_PUBSUB_TOPIC_ID": GCP_PUBSUB_TOPIC_ID,
-                "GCP_PUBSUB_SUBSCRIPTION_ID": GCP_PUBSUB_SUBSCRIPTION_ID
-            }
+            "version": "1.0",
+            "environment": os.getenv("ENVIRONMENT", "unknown")
         }
     }
 

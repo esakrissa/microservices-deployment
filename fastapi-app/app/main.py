@@ -247,7 +247,7 @@ if IS_LOCAL_DEV:
     try:
         # Note: This is kept for backward compatibility
         # The test endpoints have been moved to the main application
-        from tests.test_endpoints import router as test_router
+        from tests.endpoints import router as test_router
         app.include_router(test_router)
         logger.info("Test endpoints included for local development")
     except ImportError as e:
