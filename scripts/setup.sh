@@ -45,15 +45,26 @@ gcloud iam service-accounts create github-actions \
     --display-name="GitHub Actions"
 
 # Grant permissions
-gcloud projects add-iam-policy-binding $PROJECT_ID \
+# gcloud projects add-iam-policy-binding $PROJECT_ID \
+#     --member="serviceAccount:github-actions@$PROJECT_ID.iam.gserviceaccount.com" \
+#     --role="roles/editor"
+
+# Assign additional roles
+roles=(
+  "roles/artifactregistry.admin"
+  "roles/iam.serviceAccountTokenCreator"
+  "roles/iam.serviceAccountUser"
+  "roles/iam.workloadIdentityUser"
+  "roles/storage.admin"
+  "roles/run.admin"
+  "roles/editor"
+)
+
+for role in "${roles[@]}"; do
+  gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:github-actions@$PROJECT_ID.iam.gserviceaccount.com" \
-    --role="roles/editor"
-
-# Create and download key
-gcloud iam service-accounts keys create key.json \
-    --iam-account=github-actions@$PROJECT_ID.iam.gserviceaccount.com
-
-echo "Service account key saved to key.json. Use this for GitHub Actions."
+    --role="$role"
+done
 
 # Initialize Terraform
 echo "Initializing Terraform..."
