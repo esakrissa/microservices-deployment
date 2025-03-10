@@ -1,5 +1,6 @@
 #OIDC
 
+```bash
 External Platform                 |                Google Cloud Platform
 ---------------------------------|------------------------------------------
                                  |
@@ -19,6 +20,7 @@ Workflow Job ----token-----> Workload Identity Provider (github)
                                  |    |
                                  |    v
                                  |  GCP Resources (Cloud Run, GKE, etc.)
+```
 
 ## Mermaid Diagram Versions
 
