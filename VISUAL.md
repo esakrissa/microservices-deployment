@@ -1,7 +1,7 @@
 #OIDC
 
 ```bash
-External Platform                 |                Google Cloud Platform
+External Platform                |                Google Cloud Platform
 ---------------------------------|------------------------------------------
                                  |
 GitHub Actions                   |  Workload Identity Pool (github-actions)
