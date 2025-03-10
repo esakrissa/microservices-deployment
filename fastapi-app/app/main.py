@@ -15,6 +15,9 @@ app = FastAPI(title="FastAPI Service")
 # Message broker configuration
 BROKER_URL = os.getenv("BROKER_URL", "http://localhost:8080")
 
+# Check if we're in a local development environment
+IS_LOCAL_DEV = os.getenv("ENVIRONMENT", "production").lower() == "local"
+
 class Message(BaseModel):
     content: str
     user_id: Optional[str] = None
@@ -22,6 +25,15 @@ class Message(BaseModel):
 @app.get("/")
 async def root():
     return {"message": "FastAPI Service v1.6 is running"}
+
+# Include test endpoints only in local development environment
+if IS_LOCAL_DEV:
+    try:
+        from tests.test_endpoints import router as test_router
+        app.include_router(test_router)
+        logger.info("Test endpoints included for local development")
+    except ImportError as e:
+        logger.warning(f"Failed to import test endpoints: {str(e)}")
 
 @app.post("/process")
 async def process_message(message: Message):

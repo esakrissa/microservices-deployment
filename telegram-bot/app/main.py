@@ -10,10 +10,10 @@ import json
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Telegram Bot Token from environment variable
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-if not TELEGRAM_TOKEN:
-    raise ValueError("TELEGRAM_TOKEN environment variable is not set")
+# Environment variables
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+if not TELEGRAM_BOT_TOKEN:
+    raise ValueError("TELEGRAM_BOT_TOKEN environment variable is not set")
 
 # FastAPI service URL
 FASTAPI_URL = os.getenv("FASTAPI_URL", "http://localhost:8000")
@@ -64,7 +64,7 @@ async def send_message(message: MessageToSend):
     try:
         # Send message to Telegram
         async with httpx.AsyncClient() as client:
-            telegram_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+            telegram_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
             response = await client.post(
                 telegram_url,
                 json={

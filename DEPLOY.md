@@ -5,6 +5,21 @@ This guide provides step-by-step instructions for deploying the microservices pr
 ## Table of Contents
 - [Overview](#overview)
 - [Prerequisites](#prerequisites)
+- [Development Environment](#development-environment)
+  - [Development Prerequisites](#development-prerequisites)
+  - [Development Setup](#development-setup)
+  - [Development Workflow](#development-workflow)
+  - [Testing in Development](#testing-in-development)
+  - [Troubleshooting Development Setup](#troubleshooting-development-setup)
+- [Local Deployment](#local-deployment)
+  - [Local Prerequisites](#local-prerequisites)
+  - [Quick Start (Local)](#quick-start-local)
+  - [How Local Deployment Works](#how-local-deployment-works)
+  - [Testing the Local Setup](#testing-the-local-setup)
+  - [Local Environment Variables](#local-environment-variables)
+  - [Managing the Local Environment](#managing-the-local-environment)
+  - [Local Troubleshooting](#local-troubleshooting)
+  - [Differences from Production](#differences-from-production)
 - [Deployment Process](#deployment-process)
   - [1. Clone the Repository](#1-clone-the-repository)
   - [2. Set Up Workload Identity Federation](#2-set-up-workload-identity-federation)
@@ -46,6 +61,281 @@ Before starting, ensure you have:
 | Google Cloud SDK | Command-line interface for GCP |
 | Docker | Container platform |
 | GitHub Account | For hosting code repository |
+
+## Development Environment
+
+This section explains how to set up a local development environment for working on the project without deploying to Google Cloud Platform.
+
+### Development Prerequisites
+
+- Docker and Docker Compose installed
+- Git installed
+- Telegram Bot Token (from @BotFather)
+- ngrok account and ngrok installed (for Telegram webhook)
+
+### Development Setup
+
+1. Clone the repository:
+   ```bash
+   git clone <repository-url>
+   cd <repository-directory>
+   ```
+
+2. Copy the example environment file:
+   ```bash
+   cp .env.example .env
+   ```
+
+3. Edit the `.env` file with your values:
+   - Add your Telegram Bot Token (`TELEGRAM_BOT_TOKEN`)
+   - Other values can remain at their defaults for development
+
+4. Make the development scripts executable:
+   ```bash
+   chmod +x scripts/*.sh
+   ```
+
+5. Start the development environment:
+   ```bash
+   ./scripts/setup-dev.sh
+   ```
+
+6. In a separate terminal, start ngrok to expose your local Telegram bot:
+   ```bash
+   ngrok http 8080
+   ```
+
+7. Add the ngrok URL to your `.env` file:
+   ```
+   NGROK_URL=your-ngrok-url
+   ```
+
+8. Set up the Telegram webhook:
+   ```bash
+   ./scripts/setup-telegram-webhook-dev.sh
+   ```
+
+For detailed step-by-step instructions, see [step-by-step.txt](step-by-step.txt).
+
+### Development Workflow
+
+The development environment uses Docker Compose with:
+- Hot-reload enabled for all services
+- Local Pub/Sub emulator
+- Volume mounts for live code changes
+- Test endpoints for debugging
+
+Available services:
+- FastAPI App: http://localhost:8000
+- Telegram Bot: http://localhost:8080
+- Message Broker: http://localhost:8081
+- Pub/Sub Emulator: http://localhost:8085
+
+Common development tasks:
+
+1. View logs:
+   ```bash
+   docker-compose logs -f
+   ```
+
+2. Rebuild a specific service:
+   ```bash
+   docker-compose up -d --build service-name
+   ```
+
+3. Rebuild Telegram bot and update webhook:
+   ```bash
+   docker-compose up -d --build telegram-bot webhook-setup
+   ```
+
+4. Stop all services:
+   ```bash
+   docker-compose down
+   ```
+
+### Testing in Development
+
+The development environment includes special test endpoints:
+
+- Health Check: http://localhost:8000/test/health
+- Send Test Message: http://localhost:8000/test/send-message (POST)
+- Pub/Sub Info: http://localhost:8000/test/pubsub-info
+
+Example test command:
+```bash
+curl -X POST http://localhost:8000/test/send-message \
+  -H "Content-Type: application/json" \
+  -d '{"content": "Test message", "user_id": "test-user"}'
+```
+
+### Troubleshooting Development Setup
+
+1. If webhook not working:
+   - Check ngrok is running
+   - Verify NGROK_URL in .env
+   - Run webhook setup script again
+
+2. If services not starting:
+   - Check docker-compose logs
+   - Verify all ports are available
+   - Check .env configuration
+
+3. If changes not reflecting:
+   - Rebuild the specific service
+   - Check volume mounts
+   - Verify hot-reload is working
+
+## Local Deployment
+
+This section explains how to deploy and test the entire microservices project locally using Docker Compose, including a Pub/Sub emulator for local testing.
+
+### Local Prerequisites
+
+- Docker and Docker Compose installed on your machine
+- Git (to clone the repository)
+- Bash shell (for running the setup script)
+
+### Quick Start (Local)
+
+1. Clone the repository (if you haven't already):
+   ```bash
+   git clone <repository-url>
+   cd <repository-directory>
+   ```
+
+2. Run the local setup script:
+   ```bash
+   ./scripts/local-setup.sh
+   ```
+   
+   This script will:
+   - Check for a `.env` file and create one from `.env.example` if it doesn't exist
+   - Load environment variables from the `.env` file
+   - Start all services using Docker Compose
+
+3. If this is your first time running the setup, edit the `.env` file with your actual values:
+   ```bash
+   # Edit the .env file with your preferred editor
+   nano .env
+   
+   # Restart the services after editing
+   docker-compose down
+   docker-compose up -d
+   ```
+
+4. The services will be available at:
+   - FastAPI App: http://localhost:8000
+   - Telegram Bot: http://localhost:8080
+   - Message Broker: http://localhost:8081
+
+### How Local Deployment Works
+
+The local deployment uses Docker Compose to create and connect the following services:
+
+1. **Pub/Sub Emulator**: A local emulator for Google Cloud Pub/Sub
+2. **FastAPI App**: The main application that processes messages
+3. **Telegram Bot**: The bot that interacts with Telegram
+4. **Message Broker**: The service that handles message queuing using the Pub/Sub emulator
+
+All services are configured to work together in a local environment, with the Pub/Sub emulator replacing the actual Google Cloud Pub/Sub service.
+
+### Testing the Local Setup
+
+1. Test the FastAPI app:
+   ```bash
+   curl -X POST http://localhost:8000/process \
+     -H "Content-Type: application/json" \
+     -d '{"content": "Test message", "user_id": "test-user"}'
+   ```
+
+2. Check the logs to verify the message flow:
+   ```bash
+   docker-compose logs -f
+   ```
+
+### Local Environment Variables
+
+The project uses a `.env` file for local development. The following variables can be configured:
+
+| Variable | Description | Default Value |
+|----------|-------------|---------------|
+| `GCP_PROJECT_ID` | Project ID for the Pub/Sub emulator | local-project |
+| `GCP_PUBSUB_TOPIC_ID` | Pub/Sub topic name | messages |
+| `GCP_PUBSUB_SUBSCRIPTION_ID` | Pub/Sub subscription name | messages-sub |
+| `TELEGRAM_BOT_TOKEN` | Your Telegram bot token | *Required* |
+| `BROKER_URL` | URL of the message broker service | http://message-broker:8080 |
+| `FASTAPI_URL` | URL of the FastAPI service | http://fastapi-app:8000 |
+| `TELEGRAM_BOT_URL` | URL of the Telegram bot service | http://telegram-bot:8080 |
+| `NGROK_URL` | Your ngrok URL for Telegram webhook | *Required for development* |
+
+To set these variables:
+1. Copy `.env.example` to `.env`
+2. Edit the `.env` file with your actual values
+3. Restart the services if they're already running
+
+### Managing the Local Environment
+
+To stop all services:
+```bash
+docker-compose down
+```
+
+To stop and remove all containers, networks, and volumes:
+```bash
+docker-compose down -v
+```
+
+### Local Troubleshooting
+
+#### Pub/Sub Emulator Issues
+
+If you encounter issues with the Pub/Sub emulator:
+
+1. Check if the emulator is running:
+   ```bash
+   docker-compose ps pubsub-emulator
+   ```
+
+2. View the emulator logs:
+   ```bash
+   docker-compose logs pubsub-emulator
+   ```
+
+3. Restart the emulator:
+   ```bash
+   docker-compose restart pubsub-emulator
+   ```
+
+#### Service Connection Issues
+
+If services can't connect to each other:
+
+1. Make sure all services are running:
+   ```bash
+   docker-compose ps
+   ```
+
+2. Check the network configuration:
+   ```bash
+   docker network inspect deploy-test_default
+   ```
+
+3. Restart the affected services:
+   ```bash
+   docker-compose restart <service-name>
+   ```
+
+### Differences from Production
+
+This local setup differs from the production deployment in the following ways:
+
+1. Uses a Pub/Sub emulator instead of actual Google Cloud Pub/Sub
+2. Runs all services on a single machine instead of distributed cloud services
+3. Uses Docker Compose instead of Terraform for orchestration
+4. Doesn't require Google Cloud authentication
+5. Doesn't use Workload Identity Federation
+
+These differences make it easier to test the application locally while still maintaining a similar architecture to the production environment.
 
 ## Deployment Process
 
@@ -100,7 +390,7 @@ Add these initial secrets to your GitHub repository (Settings > Secrets and vari
 | `SERVICE_ACCOUNT` | Service account email |
 | `GCP_PROJECT_ID` | Your Google Cloud project ID |
 | `GCP_REGION` | Your preferred GCP region (e.g., us-central1) |
-| `TELEGRAM_TOKEN` | Your Telegram bot token |
+| `TELEGRAM_BOT_TOKEN` | Your Telegram bot token |
 
 ### 5. Initial Terraform Deployment
 

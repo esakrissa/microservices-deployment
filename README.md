@@ -30,15 +30,18 @@ All infrastructure is managed as code with Terraform and deployed automatically 
 /
 ├── fastapi-app/           # FastAPI application
 │   ├── app/               # Application code
-│   ├── Dockerfile         # Docker configuration
+│   ├── Dockerfile         # Production Docker configuration
+│   ├── Dockerfile.dev     # Development Docker configuration
 │   └── requirements.txt   # Python dependencies
 ├── telegram-bot/          # Telegram bot service
 │   ├── app/               # Bot code
-│   ├── Dockerfile         # Docker configuration
+│   ├── Dockerfile         # Production Docker configuration
+│   ├── Dockerfile.dev     # Development Docker configuration
 │   └── requirements.txt   # Python dependencies
 ├── message-broker/        # Message broker service
 │   ├── app/               # Broker code
-│   ├── Dockerfile         # Docker configuration
+│   ├── Dockerfile         # Production Docker configuration
+│   ├── Dockerfile.dev     # Development Docker configuration
 │   └── requirements.txt   # Python dependencies
 ├── terraform/             # Infrastructure as Code
 │   ├── main.tf            # Main Terraform configuration
@@ -51,7 +54,12 @@ All infrastructure is managed as code with Terraform and deployed automatically 
 │   └── terraform.yml      # Terraform CI/CD workflow
 ├── scripts/               # Utility scripts
 │   ├── setup.sh           # General setup script
+│   ├── setup-dev.sh       # Development environment setup
+│   ├── init-pubsub-dev.sh # Initialize Pub/Sub for development
+│   ├── setup-telegram-webhook-dev.sh # Set up Telegram webhook for development
 │   └── setup-workload-identity.sh # Script to set up Workload Identity Federation
+├── docker-compose.yml     # Local development orchestration
+├── step-by-step.txt       # Detailed setup instructions
 └── README.md              # Project documentation
 ```
 
@@ -59,18 +67,49 @@ All infrastructure is managed as code with Terraform and deployed automatically 
 
 ### Prerequisites
 
-1. Google Cloud Platform account
+1. Google Cloud Platform account (for production)
 2. Telegram Bot token (from BotFather)
-3. GitHub repository
-4. Terraform installed locally (for initial setup)
-5. Google Cloud SDK (gcloud) installed
-6. Docker installed (for local testing)
+3. GitHub repository (for production CI/CD)
+4. Terraform installed locally (for production setup)
+5. Google Cloud SDK (gcloud) installed (for production)
+6. Docker and Docker Compose installed (for development and testing)
+7. ngrok (for local Telegram webhook development)
 
-### Quick Start
+### Development Environment Setup
+
+For local development, we provide a Docker Compose setup with hot-reloading:
 
 1. Clone this repository
-2. Follow the [Deployment Guide](DEPLOY.md) for step-by-step instructions
-3. Start interacting with your Telegram bot!
+2. Copy the example environment file:
+   ```bash
+   cp .env.example .env
+   ```
+3. Add your Telegram Bot Token to the `.env` file
+4. Start the development environment:
+   ```bash
+   ./scripts/setup-dev.sh
+   ```
+5. In a separate terminal, start ngrok to expose your local Telegram bot:
+   ```bash
+   ngrok http 8080
+   ```
+6. Add the ngrok URL to your `.env` file:
+   ```
+   NGROK_URL=your-ngrok-url
+   ```
+7. Set up the Telegram webhook:
+   ```bash
+   ./scripts/setup-telegram-webhook-dev.sh
+   ```
+
+For detailed development instructions, see [step-by-step.txt](step-by-step.txt).
+
+### Production Deployment
+
+For production deployment:
+
+1. Follow the [Deployment Guide](DEPLOY.md) for step-by-step instructions
+2. Start interacting with your Telegram bot!
 
 ## 🔒 Security Features
 
@@ -104,7 +143,7 @@ Each service has its own CI/CD pipeline that is triggered only when relevant fil
 
 ### GitHub Secrets
 
-Set up the following secrets in your GitHub repository:
+Set up the following secrets in your GitHub repository (Settings > Secrets and variables > Actions):
 - `WORKLOAD_IDENTITY_PROVIDER`: The Workload Identity Provider resource name
 - `SERVICE_ACCOUNT`: The service account email
 - `GCP_PROJECT_ID`: Your Google Cloud project ID
@@ -112,7 +151,7 @@ Set up the following secrets in your GitHub repository:
 - `VM_HOST`: IP address of your VM (after initial deployment)
 - `VM_USERNAME`: SSH username for your VM
 - `VM_SSH_KEY`: SSH private key for VM access
-- `TELEGRAM_TOKEN`: Your Telegram bot token
+- `TELEGRAM_BOT_TOKEN`: Your Telegram bot token
 - `BROKER_URL`: URL of the message broker service (after initial deployment)
 - `FASTAPI_URL`: URL of the FastAPI service (after initial deployment)
 - `GCP_PUBSUB_TOPIC_ID`: Google Cloud Pub/Sub topic ID (default: messages)
@@ -125,6 +164,7 @@ Set up the following secrets in your GitHub repository:
 - **Cloud Logging**: Centralized logs for troubleshooting
 - **Error Reporting**: Automatic notification of application errors
 - **Uptime Checks**: Continuous verification of service availability
+- **Local Development**: View logs with `docker-compose logs -f`
 
 ## 🔄 Scaling
 
@@ -134,46 +174,33 @@ Set up the following secrets in your GitHub repository:
 
 ## 📝 Development
 
-### Local Setup
+### Development Environment Features
 
-1. Install dependencies for each service:
-   ```bash
-   cd fastapi-app
-   pip install -r requirements.txt
-   ```
-
-2. Run services locally:
-   ```bash
-   # FastAPI
-   cd fastapi-app
-   uvicorn app.main:app --reload
-
-   # Telegram Bot
-   cd telegram-bot
-   uvicorn app.main:app --port 8080 --reload
-
-   # Message Broker
-   cd message-broker
-   uvicorn app.main:app --port 8081 --reload
-   ```
+- **Hot-reload**: Code changes automatically reload the services
+- **Local Pub/Sub Emulator**: No need for a GCP account during development
+- **Test Endpoints**: Special endpoints for testing in development mode
+- **Docker Compose**: All services orchestrated locally
+- **Automatic Webhook Setup**: Script to configure Telegram webhook with ngrok
 
 ### Development Workflow
 
-1. Create a feature branch:
+1. Make changes to the code
+2. Services automatically reload with changes
+3. For larger changes requiring container rebuild:
    ```bash
-   git checkout -b feature/your-feature-name
+   docker-compose up -d --build service-name
+   ```
+4. For Telegram bot changes that require webhook update:
+   ```bash
+   docker-compose up -d --build telegram-bot webhook-setup
    ```
 
-2. Make changes to the relevant service(s)
+### Testing
 
-3. Push changes and create a pull request:
-   ```bash
-   git push origin feature/your-feature-name
-   ```
-
-4. GitHub Actions will run tests on your pull request
-
-5. Once approved and merged, the changes will be automatically deployed
+Test endpoints available in development:
+- Health Check: http://localhost:8000/test/health
+- Send Test Message: http://localhost:8000/test/send-message (POST)
+- Pub/Sub Info: http://localhost:8000/test/pubsub-info
 
 ## 📚 Additional Resources
 
@@ -181,6 +208,8 @@ Set up the following secrets in your GitHub repository:
 - [Telegram Bot API](https://core.telegram.org/bots/api)
 - [Terraform Documentation](https://www.terraform.io/docs)
 - [Google Cloud Documentation](https://cloud.google.com/docs)
+- [Docker Compose Documentation](https://docs.docker.com/compose/)
+- [ngrok Documentation](https://ngrok.com/docs)
 
 ## 📄 License
 

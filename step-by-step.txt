@@ -1,4 +1,5 @@
-How to deploy:
+Deployment Guide
+=================
 1. Clone the repository: git clone <repository-url> && cd <repository-directory>
 2. Install required tools: gcloud, terraform, docker
 3. Run setup script: ./scripts/setup.sh
@@ -17,3 +18,113 @@ How to deploy:
 16. Set up Telegram webhook: curl -F "url=<telegram_bot_url>/webhook" https://api.telegram.org/bot<TELEGRAM_TOKEN>/setWebhook
 17. Test the Telegram bot by sending a message
 18. Monitor logs: gcloud logging read "resource.type=cloud_run_revision"
+
+Development Environment Setup Guide
+====================================
+
+Prerequisites
+------------
+1. Docker and Docker Compose installed
+2. Python 3.11 or higher
+3. ngrok account and ngrok installed
+4. Telegram Bot Token (from @BotFather)
+
+Step 1: Initial Setup
+--------------------
+1. Clone the repository
+2. Copy .env.example to .env:
+   ```
+   cp .env.example .env
+   ```
+3. Edit .env file with your values:
+   - Add your Telegram Bot Token (TELEGRAM_BOT_TOKEN)
+   - Keep other values as default for development
+
+Step 2: Start Development Environment
+-----------------------------------
+1. Make scripts executable:
+   ```
+   chmod +x scripts/*.sh
+   ```
+2. Start all services:
+   ```
+   ./scripts/setup-dev.sh
+   ```
+3. Wait for all services to start (check with `docker-compose ps`)
+
+Step 3: Set Up Telegram Webhook
+-----------------------------
+1. Start ngrok for Telegram webhook:
+   ```
+   ngrok http 8080
+   ```
+2. Copy the HTTPS URL from ngrok (e.g., https://xxxx-xx-xx-xx-xx.ngrok-free.app)
+3. Add the URL to your .env file:
+   ```
+   NGROK_URL=your-ngrok-url
+   ```
+4. Set up the webhook:
+   ```
+   ./scripts/setup-telegram-webhook-dev.sh
+   ```
+
+Step 4: Verify Setup
+------------------
+1. Check service health:
+   ```
+   curl http://localhost:8000/test/health
+   ```
+2. Send a message to your Telegram bot
+3. Check logs if needed:
+   ```
+   docker-compose logs -f
+   ```
+
+Common Development Tasks
+----------------------
+1. Rebuild a specific service:
+   ```
+   docker-compose up -d --build service-name
+   ```
+2. Rebuild Telegram bot and update webhook:
+   ```
+   docker-compose up -d --build telegram-bot webhook-setup
+   ```
+3. View logs of a specific service:
+   ```
+   docker-compose logs -f service-name
+   ```
+4. Stop all services:
+   ```
+   docker-compose down
+   ```
+
+Available Services
+----------------
+- FastAPI App: http://localhost:8000
+- Telegram Bot: http://localhost:8080
+- Message Broker: http://localhost:8081
+- Pub/Sub Emulator: http://localhost:8085
+
+Test Endpoints
+------------
+- Health Check: http://localhost:8000/test/health
+- Send Test Message: http://localhost:8000/test/send-message (POST)
+- Pub/Sub Info: http://localhost:8000/test/pubsub-info
+
+Troubleshooting
+-------------
+1. If webhook not working:
+   - Check ngrok is running
+   - Verify NGROK_URL in .env
+   - Run webhook setup script again
+
+2. If services not starting:
+   - Check docker-compose logs
+   - Verify all ports are available
+   - Check .env configuration
+
+3. If changes not reflecting:
+   - Rebuild the specific service
+   - Check volume mounts
+   - Verify hot-reload is working

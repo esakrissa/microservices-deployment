@@ -1,0 +1,103 @@
+services:
+  # Pub/Sub emulator
+  pubsub-emulator:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    command: gcloud beta emulators pubsub start --host-port=0.0.0.0:8085 --project=${GCP_PROJECT_ID:-local-project}
+    ports:
+      - "8085:8085"
+    environment:
+      - PUBSUB_PROJECT_ID=${GCP_PROJECT_ID:-local-project}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8085"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Pub/Sub initializer
+  pubsub-init:
+    image: curlimages/curl:latest
+    volumes:
+      - ./scripts:/scripts
+    environment:
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      - GCP_PUBSUB_TOPIC_ID=${GCP_PUBSUB_TOPIC_ID}
+      - GCP_PUBSUB_SUBSCRIPTION_ID=${GCP_PUBSUB_SUBSCRIPTION_ID}
+      - PUBSUB_EMULATOR_HOST=pubsub-emulator:8085
+    entrypoint: ["/bin/sh", "/scripts/init-pubsub-dev.sh"]
+    depends_on:
+      pubsub-emulator:
+        condition: service_healthy
+
+  # FastAPI application
+  fastapi-app:
+    build:
+      context: ./fastapi-app
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8000:8000"
+    environment:
+      - BROKER_URL=${BROKER_URL}
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      - GCP_PUBSUB_TOPIC_ID=local-${GCP_PUBSUB_TOPIC_ID}
+      - GCP_PUBSUB_SUBSCRIPTION_ID=local-${GCP_PUBSUB_SUBSCRIPTION_ID}
+      - ENVIRONMENT=development
+    depends_on:
+      - message-broker
+      - pubsub-init
+    volumes:
+      - ./fastapi-app:/app
+    restart: unless-stopped
+
+  # Telegram bot service
+  telegram-bot:
+    build:
+      context: ./telegram-bot
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8080:8080"
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - PORT=8080
+      - FASTAPI_URL=http://fastapi-app:8000
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      - GCP_PUBSUB_TOPIC_ID=local-${GCP_PUBSUB_TOPIC_ID}
+      - GCP_PUBSUB_SUBSCRIPTION_ID=local-${GCP_PUBSUB_SUBSCRIPTION_ID}
+    volumes:
+      - ./telegram-bot:/app
+    restart: unless-stopped
+
+  # Message broker service
+  message-broker:
+    build:
+      context: ./message-broker
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8081:8080"
+    environment:
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      - GCP_PUBSUB_TOPIC_ID=local-${GCP_PUBSUB_TOPIC_ID}
+      - GCP_PUBSUB_SUBSCRIPTION_ID=local-${GCP_PUBSUB_SUBSCRIPTION_ID}
+      - TELEGRAM_BOT_URL=http://telegram-bot:8080
+      - PUBSUB_EMULATOR_HOST=pubsub-emulator:8085
+      - PUBSUB_PROJECT_ID=${GCP_PROJECT_ID}
+    depends_on:
+      pubsub-emulator:
+        condition: service_healthy
+      pubsub-init:
+        condition: service_completed_successfully
+    volumes:
+      - ./message-broker:/app
+    restart: unless-stopped
+
+  # Webhook setup service
+  webhook-setup:
+    image: curlimages/curl:latest
+    volumes:
+      - ./scripts:/scripts
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - NGROK_URL=${NGROK_URL}
+    entrypoint: ["/bin/sh", "/scripts/setup-telegram-webhook-dev.sh"]
+    depends_on:
+      - telegram-bot
+    restart: "no" 
