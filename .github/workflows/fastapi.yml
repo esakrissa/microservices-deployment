@@ -1,0 +1,91 @@
+name: FastAPI App CI/CD
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'fastapi-app/**'
+      - '.github/workflows/fastapi.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'fastapi-app/**'
+      - '.github/workflows/fastapi.yml'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        cd fastapi-app
+        python -m pip install --upgrade pip
+        pip install flake8 pytest
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+    
+    - name: Lint with flake8
+      run: |
+        cd fastapi-app
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+    
+    - name: Test with pytest
+      run: |
+        cd fastapi-app
+        pytest
+    
+    - name: Google Auth
+      id: auth
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+        service_account: ${{ secrets.SERVICE_ACCOUNT }}
+    
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+    
+    - name: Authorize Docker push
+      run: |
+        gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev
+    
+    - name: Build and push Docker image
+      run: |
+        cd fastapi-app
+        docker build -t ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/app-images/fastapi-app:${{ github.sha }} .
+        docker tag ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/app-images/fastapi-app:${{ github.sha }} ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/app-images/fastapi-app:latest
+        docker push ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/app-images/fastapi-app:${{ github.sha }}
+        docker push ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/app-images/fastapi-app:latest
+    
+    - name: SSH into VM and update container
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.VM_HOST }}
+        username: ${{ secrets.VM_USERNAME }}
+        key: ${{ secrets.VM_SSH_KEY }}
+        script: |
+          # Pull the latest image
+          sudo docker pull ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/app-images/fastapi-app:latest
+          
+          # Stop and remove the existing container if it exists
+          sudo docker stop fastapi-app || true
+          sudo docker rm fastapi-app || true
+          
+          # Run the new container
+          sudo docker run -d -p 80:8000 \
+            -e BROKER_URL=${{ secrets.BROKER_URL }} \
+            --restart always \
+            --name fastapi-app \
+            ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/app-images/fastapi-app:latest
+          
+          # Clean up old images (optional)
+          sudo docker image prune -a -f --filter "until=24h"

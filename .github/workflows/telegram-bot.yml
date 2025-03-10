@@ -1,0 +1,77 @@
+name: Telegram Bot CI/CD
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'telegram-bot/**'
+      - '.github/workflows/telegram-bot.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'telegram-bot/**'
+      - '.github/workflows/telegram-bot.yml'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        cd telegram-bot
+        python -m pip install --upgrade pip
+        pip install flake8 pytest
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+    
+    - name: Lint with flake8
+      run: |
+        cd telegram-bot
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+    
+    - name: Test with pytest
+      run: |
+        cd telegram-bot
+        pytest
+    
+    - name: Google Auth
+      id: auth
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+        service_account: ${{ secrets.SERVICE_ACCOUNT }}
+    
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+    
+    - name: Authorize Docker push
+      run: |
+        gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev
+    
+    - name: Build and push Docker image
+      run: |
+        cd telegram-bot
+        docker build -t ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/app-images/telegram-bot:${{ github.sha }} .
+        docker tag ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/app-images/telegram-bot:${{ github.sha }} ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/app-images/telegram-bot:latest
+        docker push ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/app-images/telegram-bot:${{ github.sha }}
+        docker push ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/app-images/telegram-bot:latest
+    
+    - name: Deploy to Cloud Run
+      uses: google-github-actions/deploy-cloudrun@v2
+      with:
+        service: telegram-bot
+        image: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/app-images/telegram-bot:${{ github.sha }}
+        region: ${{ secrets.GCP_REGION }}
+        env_vars: |
+          TELEGRAM_TOKEN=${{ secrets.TELEGRAM_TOKEN }}
+          FASTAPI_URL=${{ secrets.FASTAPI_URL }}
