@@ -4,6 +4,13 @@ provider "google" {
   zone    = var.zone
 }
 
+terraform {
+  backend "gcs" {
+    bucket = "travel-agency-448103-terraform-state"
+    prefix = "terraform/state"
+  }
+}
+
 # Use existing Artifact Registry repository
 data "google_artifact_registry_repository" "app_repo" {
   location      = var.region
