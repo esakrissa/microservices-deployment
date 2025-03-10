@@ -1,5 +1,10 @@
+import os
+import unittest.mock
 from fastapi.testclient import TestClient
-from app.main import app
+
+# Mock environment variables before importing app
+with unittest.mock.patch.dict(os.environ, {"TELEGRAM_TOKEN": "test_token", "FASTAPI_URL": "http://localhost:8000"}):
+    from app.main import app
 
 client = TestClient(app)
 
