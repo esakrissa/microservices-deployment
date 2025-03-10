@@ -52,6 +52,9 @@ Thumbs.db
 logs/
 *.log
 
+# Summaries
+summaries/
+
 # Keys and credentials
 *.pem
 *.key
