@@ -38,7 +38,8 @@ async def process_message(message: Message):
                     f"{BROKER_URL}/send",
                     json={
                         "user_id": message.user_id,
-                        "content": processed_content
+                        "content": processed_content,
+                        "service": "fastapi"
                     }
                 )
                 if response.status_code != 200:

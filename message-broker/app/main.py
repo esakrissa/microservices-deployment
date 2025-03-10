@@ -66,19 +66,23 @@ async def send_message(message: Message):
         
         logger.info(f"Message published to Pub/Sub with ID: {pub_id}")
         
-        # Forward to Telegram bot service
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{TELEGRAM_BOT_URL}/send",
-                json={
-                    "user_id": message.user_id,
-                    "content": message.content
-                }
-            )
-            
-            if response.status_code != 200:
-                logger.error(f"Error forwarding to Telegram bot: {response.text}")
-                return {"status": "queued", "detail": "Failed to forward to Telegram bot"}
+        # Only forward to Telegram bot if the message didn't originate from FastAPI
+        # This prevents duplicate messages during the request chain
+        if message.service != "fastapi":
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{TELEGRAM_BOT_URL}/send",
+                    json={
+                        "user_id": message.user_id,
+                        "content": message.content
+                    }
+                )
+                
+                if response.status_code != 200:
+                    logger.error(f"Error forwarding to Telegram bot: {response.text}")
+                    return {"status": "queued", "detail": "Failed to forward to Telegram bot"}
+        else:
+            logger.info(f"Skipping direct forward to Telegram bot for message from FastAPI")
         
         return {"status": "sent", "message_id": message_id}
     except Exception as e:
