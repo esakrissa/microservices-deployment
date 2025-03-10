@@ -143,4 +143,4 @@ async def test_pubsub_info():
             "topic_path": f"projects/{GCP_PROJECT_ID}/topics/{GCP_PUBSUB_TOPIC_ID}",
             "subscription_path": f"projects/{GCP_PROJECT_ID}/subscriptions/{GCP_PUBSUB_SUBSCRIPTION_ID}"
         }
-    } 
+    }
