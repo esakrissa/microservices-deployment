@@ -1,18 +1,7 @@
-import os
 import pytest
-from unittest import mock
 from fastapi.testclient import TestClient
 
-# Create a fixture to mock environment variables
-@pytest.fixture(scope="module", autouse=True)
-def mock_env_variables():
-    with mock.patch.dict(os.environ, {
-        "TELEGRAM_BOT_TOKEN": "test_token",
-        "FASTAPI_URL": "http://localhost:8000"
-    }):
-        yield
-
-# Import app after mocking environment variables
+# Import app after environment variables are set in conftest.py
 from app.main import app
 
 client = TestClient(app)
