@@ -3,3 +3,6 @@ uvicorn
 pydantic
 httpx
 google-cloud-pubsub
+pytest
+pytest-asyncio
+requests
