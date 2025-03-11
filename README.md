@@ -30,45 +30,58 @@ All infrastructure is managed as code with Terraform and deployed automatically 
 
 ```
 /
-├── api-gateway/           # API Gateway application
+├── api-gateway/           # API Gateway service
 │   ├── app/               # Application code
+│   │   └── utils/         # Utility functions
 │   ├── Dockerfile         # Production Docker configuration
 │   ├── Dockerfile.dev     # Development Docker configuration
 │   └── requirements.txt   # Python dependencies
-├── telegram-bot/          # Telegram bot service
-│   ├── app/               # Bot code
+├── auth-service/          # Authentication service
+│   ├── app/               # Application code
+│   │   ├── models/        # Data models
+│   │   ├── routers/       # API routes
+│   │   ├── schemas/       # Pydantic schemas
+│   │   └── services/      # Business logic
 │   ├── Dockerfile         # Production Docker configuration
-│   ├── Dockerfile.dev     # Development Docker configuration
 │   └── requirements.txt   # Python dependencies
 ├── message-broker/        # Message broker service
 │   ├── app/               # Broker code
 │   ├── Dockerfile         # Production Docker configuration
 │   ├── Dockerfile.dev     # Development Docker configuration
 │   └── requirements.txt   # Python dependencies
-├── api-gateway/           # API Gateway service
-│   ├── app/               # API Gateway code
-│   ├── Dockerfile         # Production Docker configuration
-│   ├── Dockerfile.dev     # Development Docker configuration
+├── telegram-bot/          # Telegram bot service
+│   ├── app/               # Bot code
+│   │   ├── callbacks/     # Callback handlers
+│   │   ├── handlers/      # Message handlers
+│   │   ├── models/        # Data models
+│   │   ├── states/        # State management
+│   │   └── utils/         # Utility functions
 │   └── requirements.txt   # Python dependencies
 ├── terraform/             # Infrastructure as Code
-│   ├── main.tf            # Main Terraform configuration
-│   ├── variables.tf       # Variable definitions
-│   └── outputs.tf         # Output definitions
-├── .github/workflows/     # CI/CD pipelines
-│   ├── api-gateway.yml        # API Gateway CI/CD workflow
-│   ├── telegram-bot.yml   # Telegram bot CI/CD workflow
-│   ├── message-broker.yml # Message broker CI/CD workflow
-│   ├── api-gateway.yml    # API Gateway CI/CD workflow
-│   └── terraform.yml      # Terraform CI/CD workflow
+│   ├── main.tf           # Main Terraform configuration
+│   ├── variables.tf      # Variable definitions
+│   └── outputs.tf        # Output definitions
+├── sql/                   # SQL scripts
+│   ├── auth_setup.sql     # Authentication database setup
+│   ├── auth_data.sql     # Initial data
+│   └── auth_reset.sql    # Reset scripts
 ├── scripts/               # Utility scripts
 │   ├── setup.sh           # General setup script
 │   ├── setup-dev.sh       # Development environment setup
 │   ├── init-pubsub-dev.sh # Initialize Pub/Sub for development
 │   ├── setup-telegram-webhook-dev.sh # Set up Telegram webhook for development
-│   └── setup-workload-identity.sh # Script to set up Workload Identity Federation
+│   ├── setup-workload-identity.sh # Script to set up Workload Identity Federation
+│   ├── test-auth-service.sh    # Test auth service
+│   └── test-telegram-auth.sh   # Test telegram auth
+├── .github/workflows/     # CI/CD pipelines
+│   ├── api-gateway.yml    # API Gateway CI/CD workflow
+│   ├── telegram-bot.yml   # Telegram bot CI/CD workflow
+│   ├── message-broker.yml # Message broker CI/CD workflow
+│   └── terraform.yml      # Terraform CI/CD workflow
 ├── docker-compose.yml     # Local development orchestration
-├── step-by-step.txt       # Detailed setup instructions
-└── README.md              # Project documentation
+├── step-by-step.txt      # Detailed setup instructions
+├── .env.example          # Example environment variables
+└── README.md             # Project documentation
 ```
 
 ## 🚀 Getting Started

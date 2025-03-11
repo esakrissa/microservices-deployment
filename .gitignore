@@ -60,3 +60,6 @@ summaries/
 *.key
 key.json
 credentials.json
+
+# Templates
+template.txt
