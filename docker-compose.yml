@@ -28,10 +28,32 @@ services:
       pubsub-emulator:
         condition: service_healthy
 
-  # FastAPI application
-  fastapi-app:
+  # Auth service
+  auth-service:
     build:
-      context: ./fastapi-app
+      context: ./auth-service
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8000"
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - BROKER_URL=${BROKER_URL}
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      - GCP_PUBSUB_TOPIC_ID=local-${GCP_PUBSUB_TOPIC_ID}
+      - GCP_PUBSUB_SUBSCRIPTION_ID=local-${GCP_PUBSUB_SUBSCRIPTION_ID}
+    depends_on:
+      - message-broker
+      - pubsub-init
+    volumes:
+      - ./auth-service:/app
+    restart: unless-stopped
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: ./api-gateway
       dockerfile: Dockerfile.dev
     ports:
       - "8000:8000"
@@ -41,11 +63,13 @@ services:
       - GCP_PUBSUB_TOPIC_ID=local-${GCP_PUBSUB_TOPIC_ID}
       - GCP_PUBSUB_SUBSCRIPTION_ID=local-${GCP_PUBSUB_SUBSCRIPTION_ID}
       - ENVIRONMENT=development
+      - AUTH_SERVICE_URL=http://auth-service:8000
     depends_on:
       - message-broker
       - pubsub-init
+      - auth-service
     volumes:
-      - ./fastapi-app:/app
+      - ./api-gateway:/app
     restart: unless-stopped
 
   # Telegram bot service
@@ -58,10 +82,11 @@ services:
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - PORT=8080
-      - FASTAPI_URL=http://fastapi-app:8000
+      - API_GATEWAY_URL=http://api-gateway:8000
       - GCP_PROJECT_ID=${GCP_PROJECT_ID}
       - GCP_PUBSUB_TOPIC_ID=local-${GCP_PUBSUB_TOPIC_ID}
       - GCP_PUBSUB_SUBSCRIPTION_ID=local-${GCP_PUBSUB_SUBSCRIPTION_ID}
+      - AUTH_SERVICE_URL=http://auth-service:8000
     volumes:
       - ./telegram-bot:/app
     restart: unless-stopped
@@ -80,6 +105,7 @@ services:
       - TELEGRAM_BOT_URL=http://telegram-bot:8080
       - PUBSUB_EMULATOR_HOST=pubsub-emulator:8085
       - PUBSUB_PROJECT_ID=${GCP_PROJECT_ID}
+      - AUTH_SERVICE_URL=http://auth-service:8000
     depends_on:
       pubsub-emulator:
         condition: service_healthy

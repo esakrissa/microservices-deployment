@@ -5,15 +5,20 @@ from pydantic import BaseModel, Field
 import httpx
 import logging
 from typing import Optional, List, Dict, Any
+from .utils.message_broker import MessageBrokerClient
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="FastAPI Service")
+app = FastAPI(title="API Gateway Service")
 
 # Message broker configuration
 BROKER_URL = os.getenv("BROKER_URL", "http://localhost:8080")
+AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://localhost:8001")
+
+# Initialize message broker client
+message_broker = MessageBrokerClient()
 
 # Check if we're in a local development environment
 IS_LOCAL_DEV = os.getenv("ENVIRONMENT", "production").lower() == "development"
@@ -45,7 +50,7 @@ class UserSettings(BaseModel):
     
 @app.get("/")
 async def root():
-    return {"message": "FastAPI Service v1.6 is running"}
+    return {"message": "API Gateway Service v1.0 is running"}
 
 # Travel-related endpoints
 @app.get("/api/travel/menu", response_model=TravelMenu, tags=["travel"])
@@ -256,28 +261,33 @@ if IS_LOCAL_DEV:
 
 @app.post("/process")
 async def process_message(message: Message):
+    """Process a message and forward it to the message broker."""
     try:
-        logger.info(f"Processing message: {message.content}")
+        # Prepare message data
+        message_data = {
+            "user_id": message.user_id or "anonymous",
+            "content": message.content,
+            "service": "api-gateway"
+        }
         
-        # Process the message (add your logic here)
-        processed_content = f"Processed: {message.content}"
+        # Publish message to message broker
+        await message_broker.publish_message(
+            topic="api-gateway.message.created",
+            message=message_data
+        )
         
-        # Send the processed message to the Telegram bot via message broker
-        if message.user_id:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"{BROKER_URL}/send",
-                    json={
-                        "user_id": message.user_id,
-                        "content": processed_content,
-                        "service": "fastapi"
-                    }
-                )
-                if response.status_code != 200:
-                    logger.error(f"Failed to send message to broker: {response.text}")
-                    raise HTTPException(status_code=500, detail="Failed to send message to broker")
+        # Forward to message broker service (legacy method)
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{BROKER_URL}/send",
+                json=message_data
+            )
+            
+            if response.status_code != 200:
+                logger.error(f"Error forwarding to message broker: {response.text}")
+                return {"status": "error", "detail": "Failed to forward message"}
         
-        return {"processed": processed_content}
+        return {"status": "sent", "message": "Message processed and forwarded"}
     except Exception as e:
         logger.error(f"Error processing message: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -285,3 +295,70 @@ async def process_message(message: Message):
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize services on startup."""
+    # Initialize message broker
+    if message_broker.initialize():
+        # Subscribe to relevant topics
+        message_broker.subscribe("auth.user.registered", handle_user_registered)
+        message_broker.subscribe("auth.user.login", handle_user_login)
+        message_broker.subscribe("auth.user.logout", handle_user_logout)
+        message_broker.subscribe("auth.user.updated", handle_user_updated)
+        
+        # Start listening for messages
+        app.state.streaming_pull_future = message_broker.start_listening()
+        logger.info("Message broker initialized and subscribed to topics")
+    else:
+        logger.warning("Failed to initialize message broker")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Clean up resources on shutdown."""
+    # Stop message broker
+    if hasattr(app.state, "streaming_pull_future"):
+        message_broker.stop_listening(app.state.streaming_pull_future)
+    message_broker.close()
+    logger.info("Message broker stopped")
+
+# Message broker event handlers
+async def handle_user_registered(message: Dict[str, Any]):
+    """Handle user registered event."""
+    logger.info(f"Received user registered event: {message}")
+    # Process user registration in the API Gateway service
+    # For example, initialize user settings
+    if "user_id" in message:
+        user_id = message["user_id"]
+        # Initialize user settings
+        try:
+            # Create default settings for the user
+            default_settings = {
+                "language": "en",
+                "notifications": "enabled",
+                "theme": "light"
+            }
+            
+            # Store settings in your database
+            # This is a placeholder - implement your actual storage logic
+            logger.info(f"Initialized default settings for user {user_id}")
+        except Exception as e:
+            logger.error(f"Error initializing settings for user {user_id}: {str(e)}")
+
+async def handle_user_login(message: Dict[str, Any]):
+    """Handle user login event."""
+    logger.info(f"Received user login event: {message}")
+    # Process user login in the API Gateway service
+    # For example, update last login timestamp
+
+async def handle_user_logout(message: Dict[str, Any]):
+    """Handle user logout event."""
+    logger.info(f"Received user logout event: {message}")
+    # Process user logout in the API Gateway service
+    # For example, update session status
+
+async def handle_user_updated(message: Dict[str, Any]):
+    """Handle user updated event."""
+    logger.info(f"Received user updated event: {message}")
+    # Process user update in the API Gateway service
+    # For example, update cached user data

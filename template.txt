@@ -1,0 +1,68 @@
+Recommendations for Your Architecture
+Based on your current implementation and best practices, here's what I recommend:
+Keep Direct Communication for Authentication Flows:
+Login/authentication should remain as direct HTTP calls since they require immediate responses
+Token validation is time-sensitive and should remain synchronous
+Implement Message Broker for These Scenarios:
+User Registration: After a user registers, publish an event that other services can subscribe to
+Profile Updates: When user data changes, publish events so all services can update their local caches
+Logging Out: Broadcast logout events to invalidate sessions across services
+Notifications: Send notifications to users through the Telegram bot
+Specific Implementation Suggestions:
+
+# In auth_service after successful registration
+async def register_user(self, user_data: UserCreate) -> UserResponse:
+    # Current direct DB operations...
+    user = await self.db.create_user(...)
+    
+    # Add this: Publish event to message broker
+    if self.message_broker:
+        await self.message_broker.publish(
+            "user.registered",
+            {
+                "user_id": str(user.id),
+                "email": user.email,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        )
+    
+    return user
+
+Telegram Bot as a Consumer:
+The Telegram bot should subscribe to relevant events from the message broker
+For example, it could listen for "user.notification" events to send messages to users
+
+# In telegram-bot startup
+@app.on_event("startup")
+async def startup_event():
+    # Connect to message broker
+    app.state.message_broker = MessageBroker(settings.MESSAGE_BROKER_URL)
+    await app.state.message_broker.connect()
+    
+    # Subscribe to relevant topics
+    await app.state.message_broker.subscribe("user.notification", handle_user_notification)
+
+async def handle_user_notification(message):
+    # Extract data from message
+    user_id = message["user_id"]
+    notification_text = message["text"]
+    
+    # Get telegram_id for user from database or cache
+    telegram_id = await get_telegram_id_for_user(user_id)
+    
+    # Send notification to user
+    if telegram_id:
+        await send_message(telegram_id, notification_text)
+
+Conclusion
+Your architecture should use a hybrid approach:
+Message Broker for:
+Event notifications
+Asynchronous operations
+Service decoupling
+Background processing
+Direct HTTP for:
+Authentication/authorization
+Query operations requiring immediate responses
+User-facing operations with strict latency requirements
+This hybrid approach gives you the best of both worlds: the reliability and decoupling of message-based communication and the immediacy of direct HTTP calls when needed.

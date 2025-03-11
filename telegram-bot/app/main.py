@@ -1,538 +1,212 @@
-import os
 import logging
-from fastapi import FastAPI, Request, HTTPException
-from pydantic import BaseModel
-import httpx
-from typing import Optional, Dict, Any, List, Union
-import json
-import asyncio
+from typing import Dict, Any
+from fastapi import FastAPI, Request
+from .handlers.general import (
+    handle_start_command,
+    handle_help_command,
+    handle_register_command,
+    handle_login_command,
+    handle_logout_command,
+    handle_message,
+    handle_callback_query,
+    handle_profile_command,
+    handle_dashboard_command,
+    handle_settings_command
+)
+from .utils.telegram import answer_callback_query, send_message
+from .utils.message_broker import MessageBrokerClient
+from .states.session import end_session
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
-# Environment variables
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-if not TELEGRAM_BOT_TOKEN:
-    raise ValueError("TELEGRAM_BOT_TOKEN environment variable is not set")
-
-# FastAPI service URL
-FASTAPI_URL = os.getenv("FASTAPI_URL", "http://localhost:8000")
-
+# Create FastAPI app
 app = FastAPI(title="Telegram Bot Service")
 
-class TelegramUpdate(BaseModel):
-    update_id: int
-    message: Optional[dict] = None
-    callback_query: Optional[dict] = None
-    
-class MessageToProcess(BaseModel):
-    content: str
-    user_id: str
-
-class MessageToSend(BaseModel):
-    user_id: str
-    content: str
-    parse_mode: Optional[str] = None
-    reply_markup: Optional[Dict[str, Any]] = None
-
-class InlineKeyboardButton(BaseModel):
-    text: str
-    callback_data: Optional[str] = None
-    url: Optional[str] = None
-
-class InlineKeyboardMarkup(BaseModel):
-    inline_keyboard: List[List[InlineKeyboardButton]]
+# Initialize message broker client
+message_broker = MessageBrokerClient()
 
 # Command handlers
-async def handle_start_command(chat_id: str) -> Dict[str, Any]:
-    """Handle the /start command"""
-    message = (
-        "👋 *Welcome to the Travel Bot!*\n\n"
-        "I'm here to help you plan your next adventure.\n\n"
-        "Use the buttons below to explore options or check your settings."
-    )
-    
-    # Create inline keyboard with Menu and Settings buttons
-    keyboard = {
-        "inline_keyboard": [
-            [
-                {"text": "🗺️ Travel Menu", "callback_data": "menu_main"},
-                {"text": "⚙️ Settings", "callback_data": "settings_main"}
-            ]
-        ]
-    }
-    
-    return {
-        "text": message,
-        "parse_mode": "Markdown",
-        "reply_markup": keyboard
-    }
-
-async def handle_help_command(chat_id: str) -> Dict[str, Any]:
-    """Handle the /help command"""
-    message = (
-        "🔍 *Help Information*\n\n"
-        "This bot helps you explore travel options and manage your preferences.\n\n"
-        "Available commands:\n"
-        "• /start - Show the main menu\n"
-        "• /help - Show this help information\n"
-        "• /status - Check the system status\n"
-        "• /menu - Show the travel menu\n"
-        "• /settings - Show your settings\n\n"
-        "You can also use the inline buttons for navigation."
-    )
-    
-    return {
-        "text": message,
-        "parse_mode": "Markdown"
-    }
-
-async def handle_status_command(chat_id: str) -> Dict[str, Any]:
-    """Handle the /status command by checking all services"""
-    try:
-        # Check FastAPI service
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(f"{FASTAPI_URL}/health")
-            if response.status_code == 200:
-                message = "✅ *All systems operational*\n\nThe bot is functioning normally and all services are available."
-            else:
-                message = "⚠️ *Partial system outage*\n\nSome services may be unavailable. Please try again later."
-    except Exception as e:
-        logger.error(f"Error checking status: {str(e)}")
-        message = "❌ *System outage*\n\nThe system is currently experiencing issues. Please try again later."
-    
-    return {
-        "text": message,
-        "parse_mode": "Markdown"
-    }
-
-async def handle_menu_command(chat_id: str) -> Dict[str, Any]:
-    """Handle the /menu command"""
-    try:
-        # Fetch menu data from FastAPI
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(f"{FASTAPI_URL}/api/travel/menu")
-            
-            if response.status_code == 200:
-                menu_data = response.json()
-                
-                # Format the menu message
-                message = "🗺️ *Travel Menu*\n\n"
-                
-                # Add menu items with inline buttons
-                keyboard = {"inline_keyboard": []}
-                
-                for category in menu_data.get("categories", []):
-                    message += f"*{category['name']}*\n"
-                    
-                    # Add category items to message
-                    for item in category.get("items", []):
-                        message += f"• {item['name']}: {item['description']}\n"
-                    
-                    message += "\n"
-                    
-                    # Add category button
-                    keyboard["inline_keyboard"].append([
-                        {"text": f"Browse {category['name']}", "callback_data": f"menu_category_{category['id']}"}
-                    ])
-                
-                # Add back button
-                keyboard["inline_keyboard"].append([
-                    {"text": "🔙 Back to Main Menu", "callback_data": "back_to_main"}
-                ])
-                
-                return {
-                    "text": message,
-                    "parse_mode": "Markdown",
-                    "reply_markup": keyboard
-                }
-            else:
-                return {
-                    "text": "Sorry, I couldn't fetch the menu. Please try again later.",
-                    "parse_mode": "Markdown"
-                }
-    except Exception as e:
-        logger.error(f"Error fetching menu: {str(e)}")
-        return {
-            "text": "Sorry, there was an error fetching the menu. Please try again later.",
-            "parse_mode": "Markdown"
-        }
-
-async def handle_settings_command(chat_id: str) -> Dict[str, Any]:
-    """Handle the /settings command"""
-    try:
-        # Fetch settings data from FastAPI
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(f"{FASTAPI_URL}/api/users/{chat_id}/settings")
-            
-            if response.status_code == 200:
-                settings_data = response.json()
-                
-                # Format the settings message
-                message = "⚙️ *Your Settings*\n\n"
-                
-                # Add settings items
-                for key, value in settings_data.get("settings", {}).items():
-                    message += f"*{key}*: {value}\n"
-                
-                # Create inline keyboard for settings options
-                keyboard = {
-                    "inline_keyboard": [
-                        [
-                            {"text": "🌍 Language", "callback_data": "settings_language"},
-                            {"text": "🔔 Notifications", "callback_data": "settings_notifications"}
-                        ],
-                        [
-                            {"text": "💰 Currency", "callback_data": "settings_currency"},
-                            {"text": "🕒 Time Format", "callback_data": "settings_time_format"}
-                        ],
-                        [
-                            {"text": "🔙 Back to Main Menu", "callback_data": "back_to_main"}
-                        ]
-                    ]
-                }
-                
-                return {
-                    "text": message,
-                    "parse_mode": "Markdown",
-                    "reply_markup": keyboard
-                }
-            else:
-                return {
-                    "text": "Sorry, I couldn't fetch your settings. Please try again later.",
-                    "parse_mode": "Markdown"
-                }
-    except Exception as e:
-        logger.error(f"Error fetching settings: {str(e)}")
-        return {
-            "text": "Sorry, there was an error fetching your settings. Please try again later.",
-            "parse_mode": "Markdown"
-        }
-
-# Command mapping
 COMMAND_HANDLERS = {
     "/start": handle_start_command,
+    "/login": handle_login_command,
+    "/register": handle_register_command,
+    "/logout": handle_logout_command,
     "/help": handle_help_command,
-    "/status": handle_status_command,
-    "/menu": handle_menu_command,
-    "/settings": handle_settings_command,
+    "/profile": handle_profile_command,
+    "/dashboard": handle_dashboard_command,
+    "/settings": handle_settings_command
 }
-
-# Callback query handlers
-async def handle_menu_callback(chat_id: str, callback_data: str) -> Dict[str, Any]:
-    """Handle menu-related callback queries"""
-    try:
-        # Extract callback parts
-        parts = callback_data.split('_')
-        
-        # Handle main menu request
-        if len(parts) >= 2 and parts[1] == "main":
-            return await handle_menu_command(chat_id)
-            
-        # Handle category selection
-        # Format: menu_category_{category_id}
-        if len(parts) < 3:
-            return {"text": "Invalid menu selection. Please try again."}
-        
-        category_id = parts[2]
-        
-        # Fetch category details from FastAPI
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(f"{FASTAPI_URL}/api/travel/categories/{category_id}")
-            
-            if response.status_code == 200:
-                category_data = response.json()
-                
-                # Format the category message
-                message = f"🗺️ *{category_data.get('name', 'Category')}*\n\n"
-                message += f"{category_data.get('description', '')}\n\n"
-                
-                # Add items
-                for item in category_data.get("items", []):
-                    message += f"*{item['name']}*\n"
-                    message += f"{item['description']}\n"
-                    if 'price' in item:
-                        message += f"Price: {item['price']}\n"
-                    message += "\n"
-                
-                # Create inline keyboard for navigation
-                keyboard = {
-                    "inline_keyboard": [
-                        [
-                            {"text": "🔙 Back to Menu", "callback_data": "menu_main"}
-                        ]
-                    ]
-                }
-                
-                return {
-                    "text": message,
-                    "parse_mode": "Markdown",
-                    "reply_markup": keyboard
-                }
-            else:
-                return {
-                    "text": "Sorry, I couldn't fetch the category details. Please try again later.",
-                    "parse_mode": "Markdown"
-                }
-    except Exception as e:
-        logger.error(f"Error fetching category: {str(e)}")
-        return {
-            "text": "Sorry, there was an error fetching the category details. Please try again later.",
-            "parse_mode": "Markdown"
-        }
-
-async def handle_settings_callback(chat_id: str, callback_data: str) -> Dict[str, Any]:
-    """Handle settings-related callbacks"""
-    setting_type = callback_data.split('_')[1] if len(callback_data.split('_')) > 1 else None
-    
-    if setting_type == "language":
-        message = "*🌍 Language Settings*\n\nSelect your preferred language:"
-        keyboard = {
-            "inline_keyboard": [
-                [
-                    {"text": "English 🇬🇧", "callback_data": "set_language_en"},
-                    {"text": "Español 🇪🇸", "callback_data": "set_language_es"}
-                ],
-                [
-                    {"text": "Français 🇫🇷", "callback_data": "set_language_fr"},
-                    {"text": "Deutsch 🇩🇪", "callback_data": "set_language_de"}
-                ],
-                [
-                    {"text": "🔙 Back to Settings", "callback_data": "settings_main"}
-                ]
-            ]
-        }
-    elif setting_type == "notifications":
-        message = "*🔔 Notification Settings*\n\nChoose which notifications you want to receive:"
-        keyboard = {
-            "inline_keyboard": [
-                [
-                    {"text": "Deals & Offers ✅", "callback_data": "toggle_notif_deals"}
-                ],
-                [
-                    {"text": "Travel Updates ✅", "callback_data": "toggle_notif_updates"}
-                ],
-                [
-                    {"text": "Tips & Recommendations ✅", "callback_data": "toggle_notif_tips"}
-                ],
-                [
-                    {"text": "🔙 Back to Settings", "callback_data": "settings_main"}
-                ]
-            ]
-        }
-    elif setting_type == "currency":
-        message = "*💰 Currency Settings*\n\nSelect your preferred currency:"
-        keyboard = {
-            "inline_keyboard": [
-                [
-                    {"text": "USD 🇺🇸", "callback_data": "set_currency_usd"},
-                    {"text": "EUR 🇪🇺", "callback_data": "set_currency_eur"}
-                ],
-                [
-                    {"text": "GBP 🇬🇧", "callback_data": "set_currency_gbp"},
-                    {"text": "JPY 🇯🇵", "callback_data": "set_currency_jpy"}
-                ],
-                [
-                    {"text": "🔙 Back to Settings", "callback_data": "settings_main"}
-                ]
-            ]
-        }
-    elif setting_type == "time_format":
-        message = "*🕒 Time Format Settings*\n\nSelect your preferred time format:"
-        keyboard = {
-            "inline_keyboard": [
-                [
-                    {"text": "12-hour (AM/PM)", "callback_data": "set_time_12h"}
-                ],
-                [
-                    {"text": "24-hour", "callback_data": "set_time_24h"}
-                ],
-                [
-                    {"text": "🔙 Back to Settings", "callback_data": "settings_main"}
-                ]
-            ]
-        }
-    else:
-        # Default to main settings
-        return await handle_settings_command(chat_id)
-    
-    return {
-        "text": message,
-        "parse_mode": "Markdown",
-        "reply_markup": keyboard
-    }
-
-# Callback query mapping
-CALLBACK_HANDLERS = {
-    "menu": handle_menu_callback,
-    "settings": handle_settings_callback,
-}
-
-async def send_typing_action(chat_id: str):
-    """Send typing action to Telegram"""
-    try:
-        async with httpx.AsyncClient() as client:
-            await client.post(
-                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendChatAction",
-                json={"chat_id": chat_id, "action": "typing"}
-            )
-    except Exception as e:
-        logger.error(f"Error sending typing action: {str(e)}")
 
 @app.post("/webhook")
-async def telegram_webhook(update: TelegramUpdate):
+async def telegram_webhook(request: Request):
+    """Handle Telegram webhook requests."""
     try:
-        # Handle callback queries (button clicks)
-        if update.callback_query:
-            callback_query = update.callback_query
-            callback_data = callback_query.get("data", "")
-            chat_id = str(callback_query.get("message", {}).get("chat", {}).get("id", ""))
+        update = await request.json()
+        logger.debug(f"Received update: {update}")
+        
+        # Handle callback query
+        if "callback_query" in update:
+            callback_query = update["callback_query"]
+            chat_id = str(callback_query["message"]["chat"]["id"])
+            callback_data = callback_query["data"]
+            message_data = callback_query["message"]
             
             logger.info(f"Received callback query from {chat_id}: {callback_data}")
             
-            # Send typing indicator
-            asyncio.create_task(send_typing_action(chat_id))
-            
-            # Acknowledge the callback query
-            async with httpx.AsyncClient() as client:
-                await client.post(
-                    f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/answerCallbackQuery",
-                    json={"callback_query_id": callback_query.get("id", "")}
-                )
-            
-            # Handle different callback types
-            if callback_data == "back_to_main":
-                # Return to main menu
-                response_data = await handle_start_command(chat_id)
+            # Handle callback data
+            if callback_data == "login":
+                await handle_login_command(chat_id, message_data)
+            elif callback_data == "register":
+                await handle_register_command(chat_id, message_data)
+            elif callback_data == "profile":
+                await handle_profile_command(chat_id, message_data)
+            elif callback_data == "dashboard":
+                await handle_dashboard_command(chat_id, message_data)
+            elif callback_data == "settings":
+                await handle_settings_command(chat_id, message_data)
+            elif callback_data == "help":
+                await handle_help_command(chat_id, message_data)
+            elif callback_data == "logout":
+                await handle_logout_command(chat_id, message_data)
+            elif callback_data == "start":
+                await handle_start_command(chat_id, message_data)
             else:
-                # Extract the callback type (menu, settings, etc.)
-                callback_type = callback_data.split('_')[0] if '_' in callback_data else ""
+                logger.warning(f"Unknown callback data: {callback_data}")
+                await send_message(chat_id, "Sorry, I don't understand that command.")
+            
+            # Answer callback query to stop loading animation
+            await answer_callback_query(callback_query["id"])
+            
+            return {"status": "ok"}
+        
+        # Handle message
+        if "message" in update:
+            message = update["message"]
+            
+            # Check if message contains text
+            if "text" not in message:
+                return {"status": "ok"}
+            
+            chat_id = str(message["chat"]["id"])
+            text = message["text"]
+            message_data = message
+            
+            logger.info(f"Received message from {chat_id}: {text}")
+            
+            # Check if message is a command
+            if text.startswith("/"):
+                command = text.split("@")[0].lower()  # Remove bot username if present
                 
-                if callback_type in CALLBACK_HANDLERS:
-                    response_data = await CALLBACK_HANDLERS[callback_type](chat_id, callback_data)
+                if command in COMMAND_HANDLERS:
+                    await COMMAND_HANDLERS[command](chat_id, message_data)
                 else:
-                    response_data = {
-                        "text": "Sorry, I don't know how to handle this action.",
-                        "parse_mode": "Markdown"
-                    }
+                    await send_message(chat_id, "Sorry, I don't understand that command.")
+            else:
+                # Handle regular message based on session state
+                await handle_message(chat_id, text, message_data)
             
-            # Edit the original message with the new content
-            async with httpx.AsyncClient() as client:
-                await client.post(
-                    f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/editMessageText",
-                    json={
-                        "chat_id": chat_id,
-                        "message_id": callback_query.get("message", {}).get("message_id", ""),
-                        "text": response_data.get("text", ""),
-                        "parse_mode": response_data.get("parse_mode", ""),
-                        "reply_markup": response_data.get("reply_markup", {})
-                    }
-                )
-            
-            return {"status": "success", "callback_handled": True}
+            return {"status": "ok"}
         
-        # Handle regular messages
-        if not update.message or "text" not in update.message:
-            return {"status": "no message text"}
-        
-        chat_id = str(update.message.get("chat", {}).get("id"))
-        message_text = update.message.get("text", "")
-        
-        logger.info(f"Received message from {chat_id}: {message_text}")
-        
-        # Send typing indicator
-        asyncio.create_task(send_typing_action(chat_id))
-        
-        # Check if this is a command
-        if message_text.startswith('/'):
-            command = message_text.split()[0]  # Get the command part
-            if command in COMMAND_HANDLERS:
-                response_data = await COMMAND_HANDLERS[command](chat_id)
-                
-                # Send response directly for commands
-                async with httpx.AsyncClient() as client:
-                    await client.post(
-                        f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
-                        json={
-                            "chat_id": chat_id,
-                            "text": response_data.get("text", ""),
-                            "parse_mode": response_data.get("parse_mode", ""),
-                            "reply_markup": response_data.get("reply_markup", {})
-                        }
-                    )
-                return {"status": "success", "command": command}
-        
-        # For regular messages, send to FastAPI for processing
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{FASTAPI_URL}/process",
-                json={"content": message_text, "user_id": chat_id}
-            )
-            
-            if response.status_code != 200:
-                logger.error(f"Error from FastAPI: {response.text}")
-                
-                # Send error message to user
-                error_message = "Sorry, I couldn't process your message. Please try again later."
-                await send_message(MessageToSend(user_id=chat_id, content=error_message))
-                
-                return {"status": "error", "detail": "Failed to process message"}
-        
-        return {"status": "success"}
+        return {"status": "ok"}
     except Exception as e:
-        logger.error(f"Error processing webhook: {str(e)}")
-        
-        # Try to send error message to user if possible
-        try:
-            if chat_id:
-                error_message = "Sorry, an error occurred. Please try again later."
-                await send_message(MessageToSend(user_id=chat_id, content=error_message))
-        except:
-            pass
-            
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/send")
-async def send_message(message: MessageToSend):
-    try:
-        # Send message to Telegram
-        async with httpx.AsyncClient() as client:
-            telegram_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-            
-            # Prepare request data
-            request_data = {
-                "chat_id": message.user_id,
-                "text": message.content
-            }
-            
-            # Add parse_mode if provided
-            if message.parse_mode:
-                request_data["parse_mode"] = message.parse_mode
-            
-            # Add reply_markup if provided
-            if message.reply_markup:
-                request_data["reply_markup"] = message.reply_markup
-            
-            response = await client.post(
-                telegram_url,
-                json=request_data
-            )
-            
-            if response.status_code != 200:
-                logger.error(f"Error sending message to Telegram: {response.text}")
-                raise HTTPException(status_code=500, detail="Failed to send message to Telegram")
-            
-            logger.info(f"Successfully sent message to user {message.user_id}")
-        
-        return {"status": "success"}
-    except Exception as e:
-        logger.error(f"Error sending message: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error handling webhook: {str(e)}")
+        return {"status": "error", "message": str(e)}
 
 @app.get("/health")
 async def health_check():
+    """Health check endpoint."""
     return {"status": "healthy"}
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize services on startup."""
+    # Initialize message broker
+    try:
+        if message_broker.initialize():
+            # Subscribe to relevant topics
+            message_broker.subscribe("auth.user.registered", handle_user_registered)
+            message_broker.subscribe("auth.user.login", handle_user_login)
+            message_broker.subscribe("auth.user.logout", handle_user_logout)
+            message_broker.subscribe("auth.user.updated", handle_user_updated)
+            message_broker.subscribe("auth.telegram.linked", handle_telegram_linked)
+            
+            # Start listening for messages
+            app.state.streaming_pull_future = message_broker.start_listening()
+            logger.info("Message broker initialized and subscribed to topics")
+        else:
+            logger.warning("Message broker not available - bot will run with limited functionality")
+    except Exception as e:
+        logger.warning(f"Failed to initialize message broker: {str(e)} - bot will run with limited functionality")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Clean up resources on shutdown."""
+    # Stop message broker
+    try:
+        if hasattr(app.state, "streaming_pull_future") and message_broker.is_available:
+            message_broker.stop_listening(app.state.streaming_pull_future)
+        if message_broker.is_available:
+            message_broker.close()
+            logger.info("Message broker stopped")
+    except Exception as e:
+        logger.warning(f"Error during shutdown of message broker: {str(e)}")
+
+# Message broker event handlers
+async def handle_user_registered(message: Dict[str, Any]):
+    """Handle user registered event."""
+    logger.info(f"Received user registered event: {message}")
+    # If telegram_id is in the message, send welcome message
+    if "telegram_id" in message:
+        await send_message(
+            message["telegram_id"],
+            f"Welcome to the service! Your account has been registered successfully."
+        )
+
+async def handle_user_login(message: Dict[str, Any]):
+    """Handle user login event."""
+    logger.info(f"Received user login event: {message}")
+    # If telegram_id is in the message, send login notification
+    if "telegram_id" in message:
+        await send_message(
+            message["telegram_id"],
+            f"New login detected for your account."
+        )
+
+async def handle_user_logout(message: Dict[str, Any]):
+    """Handle user logout event."""
+    logger.info(f"Received user logout event: {message}")
+    # If telegram_id is in the message, update session
+    if "telegram_id" in message:
+        await end_session(message["telegram_id"])
+        await send_message(
+            message["telegram_id"],
+            f"You have been logged out from all sessions."
+        )
+
+async def handle_user_updated(message: Dict[str, Any]):
+    """Handle user updated event."""
+    logger.info(f"Received user updated event: {message}")
+    # If telegram_id is in the message, send update notification
+    if "telegram_id" in message:
+        await send_message(
+            message["telegram_id"],
+            f"Your account information has been updated."
+        )
+
+async def handle_telegram_linked(message: Dict[str, Any]):
+    """Handle telegram linked event."""
+    logger.info(f"Received telegram linked event: {message}")
+    # Send confirmation message
+    if "telegram_id" in message:
+        await send_message(
+            message["telegram_id"],
+            f"Your Telegram account has been linked successfully."
+        )
 
 # For local development
 if __name__ == "__main__":

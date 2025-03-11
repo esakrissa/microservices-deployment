@@ -8,9 +8,10 @@ This project demonstrates a secure, scalable microservices architecture with:
 
 | Service | Technology | Deployment |
 |---------|------------|------------|
-| FastAPI App | Python/FastAPI | VM Instance (e2-micro) |
+| API Gateway | Python/FastAPI | VM Instance (e2-micro) |
 | Telegram Bot | Python | Cloud Run |
 | Message Broker | Python | Cloud Run + Google Cloud Pub/Sub |
+| API Gateway | Python | Cloud Run |
 
 All infrastructure is managed as code with Terraform and deployed automatically via GitHub Actions CI/CD pipelines using Workload Identity Federation for secure authentication.
 
@@ -18,9 +19,10 @@ All infrastructure is managed as code with Terraform and deployed automatically 
 
 ### Key Components
 
-- **FastAPI Application**: REST API for processing messages
+- **API Gateway**: REST API for processing messages
 - **Telegram Bot**: Handles user interactions via Telegram
 - **Message Broker**: Facilitates communication between services using Google Cloud Pub/Sub for message queuing
+- **API Gateway**: Handles incoming requests and routes them to the appropriate service
 - **Artifact Registry**: Secure storage for container images
 - **Workload Identity Federation**: Keyless authentication for GitHub Actions
 
@@ -28,7 +30,7 @@ All infrastructure is managed as code with Terraform and deployed automatically 
 
 ```
 /
-├── fastapi-app/           # FastAPI application
+├── api-gateway/           # API Gateway application
 │   ├── app/               # Application code
 │   ├── Dockerfile         # Production Docker configuration
 │   ├── Dockerfile.dev     # Development Docker configuration
@@ -43,14 +45,20 @@ All infrastructure is managed as code with Terraform and deployed automatically 
 │   ├── Dockerfile         # Production Docker configuration
 │   ├── Dockerfile.dev     # Development Docker configuration
 │   └── requirements.txt   # Python dependencies
+├── api-gateway/           # API Gateway service
+│   ├── app/               # API Gateway code
+│   ├── Dockerfile         # Production Docker configuration
+│   ├── Dockerfile.dev     # Development Docker configuration
+│   └── requirements.txt   # Python dependencies
 ├── terraform/             # Infrastructure as Code
 │   ├── main.tf            # Main Terraform configuration
 │   ├── variables.tf       # Variable definitions
 │   └── outputs.tf         # Output definitions
 ├── .github/workflows/     # CI/CD pipelines
-│   ├── fastapi.yml        # FastAPI CI/CD workflow
+│   ├── api-gateway.yml        # API Gateway CI/CD workflow
 │   ├── telegram-bot.yml   # Telegram bot CI/CD workflow
 │   ├── message-broker.yml # Message broker CI/CD workflow
+│   ├── api-gateway.yml    # API Gateway CI/CD workflow
 │   └── terraform.yml      # Terraform CI/CD workflow
 ├── scripts/               # Utility scripts
 │   ├── setup.sh           # General setup script
@@ -153,7 +161,7 @@ Set up the following secrets in your GitHub repository (Settings > Secrets and v
 - `VM_SSH_KEY`: SSH private key for VM access
 - `TELEGRAM_BOT_TOKEN`: Your Telegram bot token
 - `BROKER_URL`: URL of the message broker service (after initial deployment)
-- `FASTAPI_URL`: URL of the FastAPI service (after initial deployment)
+- `API_GATEWAY_URL`: URL of the API Gateway service (after initial deployment)
 - `GCP_PUBSUB_TOPIC_ID`: Google Cloud Pub/Sub topic ID (default: messages)
 - `GCP_PUBSUB_SUBSCRIPTION_ID`: Google Cloud Pub/Sub subscription ID (default: messages-sub)
 - `TELEGRAM_BOT_URL`: URL of the Telegram bot service (after initial deployment)
@@ -168,7 +176,7 @@ Set up the following secrets in your GitHub repository (Settings > Secrets and v
 
 ## 🔄 Scaling
 
-- **FastAPI VM**: Manual scaling by changing machine type in Terraform
+- **API Gatewau VM**: Manual scaling by changing machine type in Terraform
 - **Cloud Run Services**: Automatic scaling based on load
 - **Pub/Sub**: Fully managed and automatically scales with your workload
 

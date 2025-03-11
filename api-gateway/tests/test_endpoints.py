@@ -59,11 +59,11 @@ async def test_health():
     """Test endpoint to check the health of all services."""
     services = []
     
-    # Check FastAPI app
+    # Check API Gateway app
     services.append({
-        "service": "fastapi-app",
+        "service": "api-gateway",
         "status": "up",
-        "details": {"message": "FastAPI app is running"}
+        "details": {"message": "API Gateway app is running"}
     })
     
     # Check Message Broker

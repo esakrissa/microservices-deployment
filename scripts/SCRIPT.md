@@ -147,7 +147,7 @@ After completing the setup, your project should be running with:
    docker-compose logs -f
 
    # For Cloud Run
-   gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=fastapi-app"
+   gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=api-gateway"
    ```
 
 ## Troubleshooting

@@ -17,9 +17,9 @@ data "google_artifact_registry_repository" "app_repo" {
   repository_id = "app-images"
 }
 
-# VM Instance for FastAPI
-resource "google_compute_instance" "fastapi_vm" {
-  name         = "fastapi-vm"
+# VM Instance for API Gateway
+resource "google_compute_instance" "api_gateway_vm" {
+  name         = "api-gateway-vm"
   machine_type = "e2-micro"
   zone         = var.zone
 
@@ -66,16 +66,16 @@ resource "google_compute_instance" "fastapi_vm" {
     systemctl enable docker
     systemctl start docker
     
-    # Pull and run the FastAPI container
-    docker pull ${var.region}-docker.pkg.dev/${var.project_id}/app-images/fastapi-app:latest
+    # Pull and run the API Gateway container
+    docker pull ${var.region}-docker.pkg.dev/${var.project_id}/app-images/api-gateway:latest
     docker run -d -p 80:8000 \
       -e BROKER_URL=${var.broker_url} \
       --restart always \
-      --name fastapi-app \
-      ${var.region}-docker.pkg.dev/${var.project_id}/app-images/fastapi-app:latest
+      --name api-gateway \
+      ${var.region}-docker.pkg.dev/${var.project_id}/app-images/api-gateway:latest
   EOF
 
-  tags = ["fastapi", "http-server"]
+  tags = ["api-gateway", "http-server"]
 }
 
 # Firewall rule to allow HTTP traffic
@@ -108,8 +108,8 @@ resource "google_cloud_run_service" "telegram_bot" {
         }
         
         env {
-          name  = "FASTAPI_URL"
-          value = "http://${google_compute_instance.fastapi_vm.network_interface.0.access_config.0.nat_ip}:80"
+          name  = "API_GATEWAY_URL"
+          value = "http://${google_compute_instance.api_gateway_vm.network_interface.0.access_config.0.nat_ip}:80"
         }
         
         ports {

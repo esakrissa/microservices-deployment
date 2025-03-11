@@ -9,8 +9,8 @@ Deployment Guide
 7. Configure GitHub Secrets: WORKLOAD_IDENTITY_PROVIDER, SERVICE_ACCOUNT, GCP_PROJECT_ID, GCP_REGION, TELEGRAM_TOKEN
 8. Initialize Terraform: cd terraform && terraform init
 9. Apply Terraform: terraform apply -var="project_id=$GCP_PROJECT_ID" -var="region=your-region" -var="telegram_token=your-token"
-10. Note Terraform outputs: fastapi_vm_ip, telegram_bot_url, message_broker_url
-11. Add more GitHub Secrets: VM_HOST, VM_USERNAME, VM_SSH_KEY, BROKER_URL, FASTAPI_URL, GCP_PUBSUB_TOPIC_ID, GCP_PUBSUB_SUBSCRIPTION_ID, TELEGRAM_BOT_URL
+10. Note Terraform outputs: api_gateway_vm_ip, telegram_bot_url, message_broker_url
+11. Add more GitHub Secrets: VM_HOST, VM_USERNAME, VM_SSH_KEY, BROKER_URL, API_GATEWAY_URL, GCP_PUBSUB_TOPIC_ID, GCP_PUBSUB_SUBSCRIPTION_ID, TELEGRAM_BOT_URL
 12. Update Terraform with broker URL: terraform apply -var="broker_url=your-broker-url"
 13. Generate SSH key: ssh-keygen -t rsa -b 4096
 14. Add SSH key to VM metadata in Google Cloud Console
@@ -101,7 +101,7 @@ Common Development Tasks
 
 Available Services
 ----------------
-- FastAPI App: http://localhost:8000
+- API Gateway: http://localhost:8000
 - Telegram Bot: http://localhost:8080
 - Message Broker: http://localhost:8081
 - Pub/Sub Emulator: http://localhost:8085

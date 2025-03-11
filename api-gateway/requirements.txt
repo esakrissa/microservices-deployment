@@ -6,3 +6,4 @@ redis
 python-dotenv
 pytest
 pytest-asyncio
+google-cloud-pubsub

@@ -40,7 +40,7 @@ This guide provides step-by-step instructions for deploying the microservices pr
 ## Overview
 
 **Infrastructure Automation**: Terraform automatically provisions all required infrastructure:
-- ✅ VM instance for FastAPI application
+- ✅ VM instance for API Gateway
 - ✅ Cloud Run services for Telegram Bot and Message Broker
 - ✅ Google Cloud Pub/Sub for the message broker
 - ✅ Artifact Registry repository
@@ -126,7 +126,7 @@ The development environment uses Docker Compose with:
 - Test endpoints for debugging
 
 Available services:
-- FastAPI App: http://localhost:8000
+- API Gateway: http://localhost:8000
 - Telegram Bot: http://localhost:8080
 - Message Broker: http://localhost:8081
 - Pub/Sub Emulator: http://localhost:8085
@@ -224,7 +224,7 @@ This section explains how to deploy and test the entire microservices project lo
    ```
 
 4. The services will be available at:
-   - FastAPI App: http://localhost:8000
+   - API Gateway: http://localhost:8000
    - Telegram Bot: http://localhost:8080
    - Message Broker: http://localhost:8081
 
@@ -233,7 +233,7 @@ This section explains how to deploy and test the entire microservices project lo
 The local deployment uses Docker Compose to create and connect the following services:
 
 1. **Pub/Sub Emulator**: A local emulator for Google Cloud Pub/Sub
-2. **FastAPI App**: The main application that processes messages
+2. **API Gateway**: The main application that processes messages
 3. **Telegram Bot**: The bot that interacts with Telegram
 4. **Message Broker**: The service that handles message queuing using the Pub/Sub emulator
 
@@ -241,7 +241,7 @@ All services are configured to work together in a local environment, with the Pu
 
 ### Testing the Local Setup
 
-1. Test the FastAPI app:
+1. Test the API Gateway app:
    ```bash
    curl -X POST http://localhost:8000/process \
      -H "Content-Type: application/json" \
@@ -264,7 +264,7 @@ The project uses a `.env` file for local development. The following variables ca
 | `GCP_PUBSUB_SUBSCRIPTION_ID` | Pub/Sub subscription name | messages-sub |
 | `TELEGRAM_BOT_TOKEN` | Your Telegram bot token | *Required* |
 | `BROKER_URL` | URL of the message broker service | http://message-broker:8080 |
-| `FASTAPI_URL` | URL of the FastAPI service | http://fastapi-app:8000 |
+| `API_GATEWAY_URL` | URL of the API Gateway service | http://api-gateway:8000 |
 | `TELEGRAM_BOT_URL` | URL of the Telegram bot service | http://telegram-bot:8080 |
 | `NGROK_URL` | Your ngrok URL for Telegram webhook | *Required for development* |
 
@@ -415,7 +415,7 @@ terraform apply -var="project_id=YOUR_PROJECT_ID" \
 ```
 
 This will create all the infrastructure components. Note the outputs, which include:
-- `fastapi_vm_ip`: The public IP of your VM
+- `api_gateway_vm_ip`: The public IP of your VM
 - `telegram_bot_url`: The URL of your Telegram bot service
 - `message_broker_url`: The URL of your message broker service
 - `GCP_PUBSUB_TOPIC_ID` and `GCP_PUBSUB_SUBSCRIPTION_ID`: Pub/Sub topic and subscription IDs
@@ -426,11 +426,11 @@ Add these additional secrets to your GitHub repository:
 
 | Secret | Description |
 |--------|-------------|
-| `VM_HOST` | The `fastapi_vm_ip` value from Terraform output |
+| `VM_HOST` | The `api_gateway_vm_ip` value from Terraform output |
 | `VM_USERNAME` | The username for SSH access to the VM |
 | `VM_SSH_KEY` | Your private SSH key for VM access |
 | `BROKER_URL` | The `message_broker_url` value from Terraform output |
-| `FASTAPI_URL` | `http://<fastapi_vm_ip>:80` |
+| `API_GATEWAY_URL` | `http://<api_gateway_vm_ip>:80` |
 | `GCP_PUBSUB_TOPIC_ID` | The Pub/Sub topic ID (default: messages) |
 | `GCP_PUBSUB_SUBSCRIPTION_ID` | The Pub/Sub subscription ID (default: messages-sub) |
 | `TELEGRAM_BOT_URL` | The `telegram_bot_url` value from Terraform output |
@@ -488,7 +488,7 @@ Replace `<telegram_bot_url>` with your actual Telegram bot URL and `<TELEGRAM_TO
 ### 11. Verify Deployment
 
 1. Check that all services are running:
-   - VM: SSH into the VM and run `docker ps` to verify the FastAPI container is running
+   - VM: SSH into the VM and run `docker ps` to verify the API Gateway container is running
    - Cloud Run: Check the Cloud Run console to verify the Telegram bot and message broker services are deployed
 
 2. Check Docker containers:
@@ -504,7 +504,7 @@ Replace `<telegram_bot_url>` with your actual Telegram bot URL and `<TELEGRAM_TO
 ## Continuous Deployment
 
 After the initial setup, the CI/CD pipeline will automatically:
-- Build and deploy the FastAPI app when changes are made to the `fastapi-app` directory
+- Build and deploy the API Gateway when changes are made to the `api-gateway` directory
 - Build and deploy the Telegram bot when changes are made to the `telegram-bot` directory
 - Build and deploy the message broker when changes are made to the `message-broker` directory
 - Apply Terraform changes when modifications are made to the `terraform` directory
@@ -513,7 +513,7 @@ After the initial setup, the CI/CD pipeline will automatically:
 
 ### VM Deployment Issues
 
-If the FastAPI app isn't running on the VM:
+If the API Gateway app isn't running on the VM:
 
 1. SSH into the VM:
    ```bash

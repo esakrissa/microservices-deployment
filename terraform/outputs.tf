@@ -1,6 +1,6 @@
-output "fastapi_vm_ip" {
-  description = "The public IP address of the FastAPI VM"
-  value       = google_compute_instance.fastapi_vm.network_interface.0.access_config.0.nat_ip
+output "api_gateway_vm_ip" {
+  description = "The public IP address of the API Gateway VM"
+  value       = google_compute_instance.api_gateway_vm.network_interface.0.access_config.0.nat_ip
 }
 
 output "telegram_bot_url" {
