@@ -41,7 +41,9 @@ CREATE TABLE IF NOT EXISTS telegram_sessions (
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     telegram_id VARCHAR(255) NOT NULL,
     token TEXT,
+    session_data JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_activity TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     is_active BOOLEAN DEFAULT true,
     UNIQUE(telegram_id, is_active)
@@ -174,6 +176,11 @@ CREATE TRIGGER update_telegram_accounts_updated_at
 
 CREATE TRIGGER update_roles_updated_at
     BEFORE UPDATE ON roles
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_telegram_sessions_updated_at
+    BEFORE UPDATE ON telegram_sessions
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 

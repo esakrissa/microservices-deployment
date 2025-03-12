@@ -203,6 +203,10 @@ async def handle_registration_password(telegram_id: str, password: str) -> None:
                         telegram_id,
                         "Registration successful! You are now logged in."
                     )
+                    
+                    # Show main menu
+                    from ..handlers.general import handle_start_command
+                    await handle_start_command(telegram_id, {})
                 except Exception as e:
                     logger.error(f"Error processing successful registration response: {str(e)}")
                     await send_message(
@@ -308,6 +312,10 @@ async def handle_login_password(telegram_id: str, password: str) -> None:
                                 telegram_id,
                                 "Login successful! You are now logged in."
                             )
+                            
+                            # Show main menu
+                            from ..handlers.general import handle_start_command
+                            await handle_start_command(telegram_id, {})
                         else:
                             logger.error(f"Failed to authenticate session for user {telegram_id}")
                             await send_message(

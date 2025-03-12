@@ -9,3 +9,4 @@ pytest-asyncio
 requests
 pydantic-settings
 google-cloud-pubsub
+supabase

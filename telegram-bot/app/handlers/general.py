@@ -16,7 +16,8 @@ from ..states.session import (
     get_session_state,
     update_session_state,
     get_session,
-    end_session
+    end_session,
+    get_session_context
 )
 
 logger = logging.getLogger(__name__)
@@ -25,6 +26,10 @@ settings = get_settings()
 async def handle_start_command(chat_id: str, message_data: dict) -> None:
     """Handle /start command."""
     logger.info(f"Handling start command for chat_id: {chat_id}")
+    
+    # Create or get session first
+    session = await get_or_create_session(chat_id)
+    logger.info(f"Session created or retrieved for chat_id: {chat_id}")
     
     # Check if user is authenticated
     is_authenticated = await check_auth(chat_id)
@@ -73,7 +78,23 @@ async def handle_start_command(chat_id: str, message_data: dict) -> None:
 
 async def handle_register_command(chat_id: str, message_data: Dict[str, Any]) -> None:
     """Handle the /register command."""
-    await start_registration(chat_id)
+    # Get or create session first
+    session = await get_or_create_session(chat_id)
+    
+    # Set session state to AWAITING_EMAIL
+    await update_session_state(
+        chat_id, 
+        AuthState.AWAITING_EMAIL,
+        {"registration_data": {}}
+    )
+    
+    logger.info(f"Starting registration for user {chat_id}, set state to AWAITING_EMAIL")
+    
+    # Send registration prompt
+    await send_message(
+        chat_id,
+        "Please enter your email address to register:"
+    )
 
 async def handle_login_command(chat_id: str, message_data: Dict[str, Any]) -> None:
     """Handle the /login command."""
@@ -140,18 +161,64 @@ async def handle_message(chat_id: str, text: str, message_data: Dict[str, Any]) 
     # Get current session state
     state = await get_session_state(chat_id)
     
+    logger.info(f"Handling message from {chat_id}: '{text}' with state: {state}")
+    
+    # Check if this is an email format (simple check)
+    import re
+    email_pattern = r"[^@]+@[^@]+\.[^@]+"
+    is_email = re.match(email_pattern, text)
+    
+    if is_email:
+        logger.info(f"Detected email format in message: {text}")
+        # This looks like an email, check if we're in registration flow or should start it
+        if state is None or state == AuthState.AWAITING_EMAIL:
+            logger.info(f"Handling email for registration: {text}")
+            # Get or create session
+            session = await get_or_create_session(chat_id)
+            
+            # Get context or create new
+            context = await get_session_context(chat_id)
+            registration_data = context.get("registration_data", {})
+            
+            # Update registration data
+            registration_data["email"] = text
+            
+            # Update session state
+            await update_session_state(
+                chat_id, 
+                AuthState.AWAITING_USERNAME,
+                {"registration_data": registration_data}
+            )
+            
+            await send_message(
+                chat_id,
+                "Great! Now please enter your desired username:"
+            )
+            return
+    
+    # If we have a state, handle it accordingly
     if state is None:
         # No active state, just acknowledge the message
+        logger.info(f"No active state for user {chat_id}, sending default response")
         await send_message(chat_id, "I'm not sure what you want to do. Please use the menu or commands.")
         return
     
     # If state is INITIAL, show the start menu
     if state == AuthState.INITIAL:
+        logger.info(f"User {chat_id} is in INITIAL state, showing start menu")
         await handle_start_command(chat_id, message_data)
         return
     
-    # Handle message based on state
-    await handle_auth_message(chat_id, text)
+    # Handle authentication states
+    if state in [AuthState.AWAITING_EMAIL, AuthState.AWAITING_USERNAME, AuthState.AWAITING_PASSWORD,
+                AuthState.AWAITING_LOGIN_EMAIL, AuthState.AWAITING_LOGIN_PASSWORD]:
+        logger.info(f"User {chat_id} is in authentication state {state.name}, handling auth message")
+        await handle_auth_message(chat_id, text)
+        return
+    
+    # For any other state, just acknowledge the message
+    logger.warning(f"Unhandled state {state.name} for user {chat_id}")
+    await send_message(chat_id, "I'm not sure what you want to do. Please use the menu or commands.")
 
 async def handle_status_command(chat_id: str) -> Dict[str, Any]:
     """Handle the /status command by checking all services."""
@@ -243,7 +310,14 @@ async def handle_profile_command(chat_id: str, message_data: Dict[str, Any]) -> 
     try:
         # Get session data
         session_data = await get_session(chat_id)
-        token = session_data.get("token")
+        token = session_data.get("auth_token")
+        
+        if not token:
+            logger.error(f"No auth token found in session for user {chat_id}")
+            await send_message(chat_id, "Authentication error. Please try logging in again.")
+            return
+            
+        logger.info(f"Retrieved auth token for user {chat_id}, making request to /users/me")
         
         # Get user profile from auth service
         async with httpx.AsyncClient(timeout=10.0) as client:
