@@ -13,8 +13,8 @@ class MessageBrokerClient:
     def __init__(self):
         """Initialize the message broker client."""
         self.project_id = os.getenv("GCP_PROJECT_ID", "local-project")
-        self.topic_id = os.getenv("GCP_PUBSUB_TOPIC_ID", "messages")
-        self.subscription_id = os.getenv("GCP_PUBSUB_SUBSCRIPTION_ID", "messages-sub")
+        self.topic_id = os.getenv("GCP_PUBSUB_TOPIC_ID", "messages-dev")
+        self.subscription_id = os.getenv("GCP_PUBSUB_SUBSCRIPTION_ID", "messages-sub-dev")
         self.publisher = None
         self.subscriber = None
         self.topic_path = None

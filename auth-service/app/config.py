@@ -9,15 +9,18 @@ class Settings(BaseSettings):
     # JWT settings
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     
     # Message broker settings
     BROKER_URL: str = "http://message-broker:8080"
     
     # GCP settings
     GCP_PROJECT_ID: str = "local-project"
-    GCP_PUBSUB_TOPIC_ID: str = "messages"
-    GCP_PUBSUB_SUBSCRIPTION_ID: str = "messages-sub"
+    GCP_PUBSUB_TOPIC_ID: str = "messages-dev"
+    GCP_PUBSUB_SUBSCRIPTION_ID: str = "messages-sub-dev"
+    
+    # Internal API key for service-to-service communication
+    INTERNAL_API_KEY: str = "your-internal-api-key"
     
     class Config:
         env_file = ".env"

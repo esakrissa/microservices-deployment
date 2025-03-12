@@ -20,8 +20,8 @@ router = APIRouter(prefix="/test", tags=["test"])
 # Get environment variables
 BROKER_URL = os.getenv("BROKER_URL", "http://message-broker:8080")
 GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID", "local-project")
-GCP_PUBSUB_TOPIC_ID = os.getenv("GCP_PUBSUB_TOPIC_ID", "local-messages")
-GCP_PUBSUB_SUBSCRIPTION_ID = os.getenv("GCP_PUBSUB_SUBSCRIPTION_ID", "local-messages-sub")
+GCP_PUBSUB_TOPIC_ID = os.getenv("GCP_PUBSUB_TOPIC_ID", "messages-dev")
+GCP_PUBSUB_SUBSCRIPTION_ID = os.getenv("GCP_PUBSUB_SUBSCRIPTION_ID", "messages-sub-dev")
 
 # Models
 class TestMessage(BaseModel):

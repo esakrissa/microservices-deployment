@@ -1,6 +1,7 @@
 services:
   # Pub/Sub emulator
   pubsub-emulator:
+    container_name: pubsub-emulator
     image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
     command: gcloud beta emulators pubsub start --host-port=0.0.0.0:8085 --project=${GCP_PROJECT_ID:-local-project}
     ports:
@@ -15,6 +16,7 @@ services:
 
   # Pub/Sub initializer
   pubsub-init:
+    container_name: pubsub-init
     image: curlimages/curl:latest
     volumes:
       - ./scripts:/scripts
@@ -30,6 +32,7 @@ services:
 
   # Auth service
   auth-service:
+    container_name: auth-service
     build:
       context: ./auth-service
       dockerfile: Dockerfile
@@ -41,8 +44,9 @@ services:
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       - BROKER_URL=${BROKER_URL}
       - GCP_PROJECT_ID=${GCP_PROJECT_ID}
-      - GCP_PUBSUB_TOPIC_ID=local-${GCP_PUBSUB_TOPIC_ID}
-      - GCP_PUBSUB_SUBSCRIPTION_ID=local-${GCP_PUBSUB_SUBSCRIPTION_ID}
+      - GCP_PUBSUB_TOPIC_ID=${GCP_PUBSUB_TOPIC_ID}-dev
+      - GCP_PUBSUB_SUBSCRIPTION_ID=${GCP_PUBSUB_SUBSCRIPTION_ID}-dev
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-your-internal-api-key}
     depends_on:
       - message-broker
       - pubsub-init
@@ -52,6 +56,7 @@ services:
 
   # API Gateway
   api-gateway:
+    container_name: api-gateway
     build:
       context: ./api-gateway
       dockerfile: Dockerfile.dev
@@ -60,10 +65,11 @@ services:
     environment:
       - BROKER_URL=${BROKER_URL}
       - GCP_PROJECT_ID=${GCP_PROJECT_ID}
-      - GCP_PUBSUB_TOPIC_ID=local-${GCP_PUBSUB_TOPIC_ID}
-      - GCP_PUBSUB_SUBSCRIPTION_ID=local-${GCP_PUBSUB_SUBSCRIPTION_ID}
+      - GCP_PUBSUB_TOPIC_ID=${GCP_PUBSUB_TOPIC_ID}-dev
+      - GCP_PUBSUB_SUBSCRIPTION_ID=${GCP_PUBSUB_SUBSCRIPTION_ID}-dev
       - ENVIRONMENT=development
       - AUTH_SERVICE_URL=http://auth-service:8000
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-your-internal-api-key}
     depends_on:
       - message-broker
       - pubsub-init
@@ -74,6 +80,7 @@ services:
 
   # Telegram bot service
   telegram-bot:
+    container_name: telegram-bot
     build:
       context: ./telegram-bot
       dockerfile: Dockerfile.dev
@@ -81,18 +88,21 @@ services:
       - "8080:8080"
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_WEBHOOK_URL=${NGROK_URL}/webhook
       - PORT=8080
       - API_GATEWAY_URL=http://api-gateway:8000
       - GCP_PROJECT_ID=${GCP_PROJECT_ID}
-      - GCP_PUBSUB_TOPIC_ID=local-${GCP_PUBSUB_TOPIC_ID}
-      - GCP_PUBSUB_SUBSCRIPTION_ID=local-${GCP_PUBSUB_SUBSCRIPTION_ID}
+      - GCP_PUBSUB_TOPIC_ID=${GCP_PUBSUB_TOPIC_ID}-dev
+      - GCP_PUBSUB_SUBSCRIPTION_ID=${GCP_PUBSUB_SUBSCRIPTION_ID}-dev
       - AUTH_SERVICE_URL=http://auth-service:8000
+      - API_KEY=${INTERNAL_API_KEY:-your-internal-api-key}
     volumes:
       - ./telegram-bot:/app
     restart: unless-stopped
 
   # Message broker service
   message-broker:
+    container_name: message-broker
     build:
       context: ./message-broker
       dockerfile: Dockerfile.dev
@@ -100,12 +110,13 @@ services:
       - "8081:8080"
     environment:
       - GCP_PROJECT_ID=${GCP_PROJECT_ID}
-      - GCP_PUBSUB_TOPIC_ID=local-${GCP_PUBSUB_TOPIC_ID}
-      - GCP_PUBSUB_SUBSCRIPTION_ID=local-${GCP_PUBSUB_SUBSCRIPTION_ID}
+      - GCP_PUBSUB_TOPIC_ID=${GCP_PUBSUB_TOPIC_ID}-dev
+      - GCP_PUBSUB_SUBSCRIPTION_ID=${GCP_PUBSUB_SUBSCRIPTION_ID}-dev
       - TELEGRAM_BOT_URL=http://telegram-bot:8080
       - PUBSUB_EMULATOR_HOST=pubsub-emulator:8085
       - PUBSUB_PROJECT_ID=${GCP_PROJECT_ID}
       - AUTH_SERVICE_URL=http://auth-service:8000
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-your-internal-api-key}
     depends_on:
       pubsub-emulator:
         condition: service_healthy
@@ -117,6 +128,7 @@ services:
 
   # Webhook setup service
   webhook-setup:
+    container_name: webhook-setup
     image: curlimages/curl:latest
     volumes:
       - ./scripts:/scripts
@@ -126,4 +138,8 @@ services:
     entrypoint: ["/bin/sh", "/scripts/setup-telegram-webhook-dev.sh"]
     depends_on:
       - telegram-bot
-    restart: "no" 
+    restart: "no"
+
+networks:
+  default:
+    name: app-network 

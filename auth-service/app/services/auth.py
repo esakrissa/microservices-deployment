@@ -244,3 +244,14 @@ class AuthService:
             return payload
         except JWTError:
             return None 
+
+    async def get_telegram_id_for_user(self, user_id: str) -> Optional[str]:
+        """Get the Telegram ID for a user."""
+        try:
+            response = self.supabase.table('telegram_accounts').select('telegram_id').eq('user_id', user_id).execute()
+            if len(response.data) == 0:
+                return None
+            return response.data[0]['telegram_id']
+        except Exception as e:
+            logger.error(f"Error getting Telegram ID for user {user_id}: {str(e)}")
+            return None 

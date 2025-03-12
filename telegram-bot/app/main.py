@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from fastapi import FastAPI, Request
 from .handlers.general import (
     handle_start_command,
@@ -16,6 +16,8 @@ from .handlers.general import (
 from .utils.telegram import answer_callback_query, send_message
 from .utils.message_broker import MessageBrokerClient
 from .states.session import end_session
+import httpx
+from .config import get_settings
 
 # Configure logging
 logging.basicConfig(
@@ -23,6 +25,9 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Get settings
+settings = get_settings()
 
 # Create FastAPI app
 app = FastAPI(title="Telegram Bot Service")
@@ -159,54 +164,161 @@ async def shutdown_event():
 # Message broker event handlers
 async def handle_user_registered(message: Dict[str, Any]):
     """Handle user registered event."""
-    logger.info(f"Received user registered event: {message}")
-    # If telegram_id is in the message, send welcome message
-    if "telegram_id" in message:
-        await send_message(
-            message["telegram_id"],
-            f"Welcome to the service! Your account has been registered successfully."
-        )
+    try:
+        logger.info(f"Received user registered event with ID: {message.get('id', 'unknown')}")
+        
+        # Extract payload from standardized message format
+        payload = message.get("payload", message)
+        
+        # Get user information
+        user_id = payload.get("user_id")
+        username = payload.get("username")
+        email = payload.get("email")
+        
+        # Get telegram_id from database if available
+        telegram_id = await get_telegram_id_for_user(user_id)
+        
+        if telegram_id:
+            # Send welcome message
+            await send_message(
+                telegram_id,
+                f"Welcome to the service, {username}! Your account has been registered successfully."
+            )
+            logger.info(f"Sent welcome message to user {username} (Telegram ID: {telegram_id})")
+        else:
+            logger.info(f"No Telegram ID found for user {user_id}, skipping welcome message")
+    except Exception as e:
+        logger.error(f"Error handling user registered event: {str(e)}")
 
 async def handle_user_login(message: Dict[str, Any]):
     """Handle user login event."""
-    logger.info(f"Received user login event: {message}")
-    # If telegram_id is in the message, send login notification
-    if "telegram_id" in message:
-        await send_message(
-            message["telegram_id"],
-            f"New login detected for your account."
-        )
+    try:
+        logger.info(f"Received user login event with ID: {message.get('id', 'unknown')}")
+        
+        # Extract payload from standardized message format
+        payload = message.get("payload", message)
+        
+        # Get user information
+        user_id = payload.get("user_id")
+        timestamp = payload.get("timestamp", "unknown time")
+        
+        # Get telegram_id from database if available
+        telegram_id = await get_telegram_id_for_user(user_id)
+        
+        if telegram_id:
+            # Send login notification
+            await send_message(
+                telegram_id,
+                f"New login detected for your account at {timestamp}."
+            )
+            logger.info(f"Sent login notification to user with Telegram ID: {telegram_id}")
+        else:
+            logger.info(f"No Telegram ID found for user {user_id}, skipping login notification")
+    except Exception as e:
+        logger.error(f"Error handling user login event: {str(e)}")
 
 async def handle_user_logout(message: Dict[str, Any]):
     """Handle user logout event."""
-    logger.info(f"Received user logout event: {message}")
-    # If telegram_id is in the message, update session
-    if "telegram_id" in message:
-        await end_session(message["telegram_id"])
-        await send_message(
-            message["telegram_id"],
-            f"You have been logged out from all sessions."
-        )
+    try:
+        logger.info(f"Received user logout event with ID: {message.get('id', 'unknown')}")
+        
+        # Extract payload from standardized message format
+        payload = message.get("payload", message)
+        
+        # Get user information
+        user_id = payload.get("user_id")
+        
+        # Get telegram_id from database if available
+        telegram_id = await get_telegram_id_for_user(user_id)
+        
+        if telegram_id:
+            # End session and notify user
+            await end_session(telegram_id)
+            await send_message(
+                telegram_id,
+                "You have been logged out from all sessions."
+            )
+            logger.info(f"Ended session and sent logout notification to user with Telegram ID: {telegram_id}")
+        else:
+            logger.info(f"No Telegram ID found for user {user_id}, skipping logout notification")
+    except Exception as e:
+        logger.error(f"Error handling user logout event: {str(e)}")
 
 async def handle_user_updated(message: Dict[str, Any]):
     """Handle user updated event."""
-    logger.info(f"Received user updated event: {message}")
-    # If telegram_id is in the message, send update notification
-    if "telegram_id" in message:
-        await send_message(
-            message["telegram_id"],
-            f"Your account information has been updated."
-        )
+    try:
+        logger.info(f"Received user updated event with ID: {message.get('id', 'unknown')}")
+        
+        # Extract payload from standardized message format
+        payload = message.get("payload", message)
+        
+        # Get user information
+        user_id = payload.get("user_id")
+        
+        # Get telegram_id from database if available
+        telegram_id = await get_telegram_id_for_user(user_id)
+        
+        if telegram_id:
+            # Notify user about profile update
+            await send_message(
+                telegram_id,
+                "Your profile has been updated."
+            )
+            logger.info(f"Sent profile update notification to user with Telegram ID: {telegram_id}")
+        else:
+            logger.info(f"No Telegram ID found for user {user_id}, skipping profile update notification")
+    except Exception as e:
+        logger.error(f"Error handling user updated event: {str(e)}")
 
 async def handle_telegram_linked(message: Dict[str, Any]):
     """Handle telegram linked event."""
-    logger.info(f"Received telegram linked event: {message}")
-    # Send confirmation message
-    if "telegram_id" in message:
-        await send_message(
-            message["telegram_id"],
-            f"Your Telegram account has been linked successfully."
-        )
+    try:
+        logger.info(f"Received telegram linked event with ID: {message.get('id', 'unknown')}")
+        
+        # Extract payload from standardized message format
+        payload = message.get("payload", message)
+        
+        # Get telegram_id
+        telegram_id = payload.get("telegram_id")
+        
+        if telegram_id:
+            # Send welcome message
+            await send_message(
+                telegram_id,
+                "Your Telegram account has been successfully linked to your user account!"
+            )
+            logger.info(f"Sent telegram linked notification to user with Telegram ID: {telegram_id}")
+        else:
+            logger.warning(f"No Telegram ID found in telegram linked event")
+    except Exception as e:
+        logger.error(f"Error handling telegram linked event: {str(e)}")
+
+async def get_telegram_id_for_user(user_id: str) -> Optional[str]:
+    """Get Telegram ID for a user from the database."""
+    if not user_id:
+        return None
+        
+    try:
+        # Check if we have a direct mapping in the session
+        # This is a placeholder - in a real implementation, you would query your database
+        # or make an API call to the auth service to get the telegram_id for a user_id
+        
+        # For now, we'll make a call to the auth service
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                f"{settings.AUTH_SERVICE_URL}/users/{user_id}/telegram",
+                headers={"X-API-Key": settings.API_KEY}
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                return data.get("telegram_id")
+            else:
+                logger.warning(f"Failed to get Telegram ID for user {user_id}: {response.status_code}")
+                return None
+    except Exception as e:
+        logger.error(f"Error getting Telegram ID for user {user_id}: {str(e)}")
+        return None
 
 # For local development
 if __name__ == "__main__":

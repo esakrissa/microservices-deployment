@@ -5,8 +5,8 @@
 
 # Set default values if not provided
 PROJECT_ID=${GCP_PROJECT_ID:-local-project}
-TOPIC_ID="local-${GCP_PUBSUB_TOPIC_ID:-messages}"
-SUBSCRIPTION_ID="local-${GCP_PUBSUB_SUBSCRIPTION_ID:-messages-sub}"
+TOPIC_ID="${GCP_PUBSUB_TOPIC_ID:-messages}-dev"
+SUBSCRIPTION_ID="${GCP_PUBSUB_SUBSCRIPTION_ID:-messages-sub}-dev"
 PUBSUB_EMULATOR_HOST=${PUBSUB_EMULATOR_HOST:-pubsub-emulator:8085}
 
 echo "Initializing Pub/Sub emulator with:"

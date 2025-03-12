@@ -16,7 +16,7 @@ app = FastAPI(title="Message Broker Service")
 
 # GCP Pub/Sub configuration
 PROJECT_ID = os.getenv("GCP_PROJECT_ID")
-TOPIC_ID = os.getenv("GCP_PUBSUB_TOPIC_ID", "messages")
+TOPIC_ID = os.getenv("GCP_PUBSUB_TOPIC_ID", "messages-dev")
 
 # Telegram bot service URL
 TELEGRAM_BOT_URL = os.getenv("TELEGRAM_BOT_URL", "http://localhost:8080")

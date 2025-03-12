@@ -10,8 +10,8 @@ from ..utils.supabase import store_session, get_session_from_supabase, delete_se
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-# Session timeout in seconds (30 minutes)
-SESSION_TIMEOUT = 30 * 60
+# Session timeout in seconds (60 minutes)
+SESSION_TIMEOUT = 60 * 60
 
 class BotSession:
     """Bot session class for managing user state in the bot."""
